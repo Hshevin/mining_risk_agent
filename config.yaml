@@ -1,0 +1,430 @@
+# 工矿企业风险预警智能体系统配置
+# Mining Risk Warning Agent System Configuration
+
+project:
+  name: "mining_risk_agent"
+  version: "1.0.0"
+  debug: false
+
+# 数据配置
+data:
+  raw_data_path: "../公开数据/公开数据/数据补充"
+  reference_data_path: "../公开数据/公开数据/数据参考"
+  supported_formats: ["csv", "xlsx", "json"]
+  encoding: "utf-8-sig"
+  batch_size: 1000
+  
+# 特征工程配置
+features:
+  # 主键字段（不参与评分）
+  id_columns:
+    - "主键ID"
+    - "企业ID"
+    - "统一社会信用代码"
+    - "生产经营地址id"
+  
+  # 二值型字段
+  binary_columns:
+    - "是否发生事故"
+    - "是否发生事件"
+    - "是否发现问题隐患 0-否 1-是"
+    - "防控措施是否有效落实 1是 0否"
+    - "是否投保"
+    - "是否履行\"三同时\"手续"
+    - "是否规上企业"
+    - "是否上报风险报告"
+  
+  # 数值型字段
+  numeric_columns:
+    - "从业人员本科占比"
+    - "上一年人员流动率"
+    - "专职安全生产管理人持证员数"
+    - "兼职安全生产管理人持证员数"
+    - "特种作业人数持证人数"
+    - "安全生产投入占比"
+    - "上一年经营收入"
+    - "固定资产"
+    - "企业职工总人数"
+    - "企业职工外用总人数"
+    - "企业安全管理人员数量"
+    - "专职安全生产管理人员数"
+    - "兼职安全生产管理人员数"
+    - "部门安全管理人员数量"
+    - "投保金额"
+    - "工伤保险支出（万元）"
+    - "投保人数"
+  
+  # 枚举型字段
+  enum_columns:
+    - "管理类别"
+    - "风险等级"
+    - "行业监管大类"
+    - "行业监管小类"
+    - "企业规模"
+    - "法人类型"
+    - "企业类型"
+    - "登记状态"
+    - "经营状态   0：正常，1：注销,2歇业"
+    - "安全生产标准化建设情况"
+    - "安全等级"
+  
+  # 文本型字段
+  text_columns:
+    - "具体风险描述"
+    - "管控措施"
+    - "管控措施详细信息"
+    - "整改意见"
+    - "经营范围"
+    - "主营业务及产品"
+    - "工艺流程内容"
+    - "备注"
+  
+  # 行业分类字段
+  industry_columns:
+    - "国民经济门类"
+    - "国民经济大类"
+    - "国民经济中类"
+    - "国民经济小类"
+    - "行业监管分类-大类"
+  
+  # 缺失值处理策略
+  missing_value_strategy:
+    management_fields:
+      strategy: "high_score"
+      fields:
+        - "安全生产标准化建设情况"
+        - "安全等级"
+        - "安全管理部门"
+    objective_fields:
+      strategy: "mean_imputation"
+      fields:
+        - "从业人员本科占比"
+        - "上一年人员流动率"
+        - "安全生产投入占比"
+  
+  # 极端值截断阈值（分位数）
+  outlier_clip_quantile: 0.99
+
+# 模型配置
+model:
+  stacking:
+    # 基学习器配置
+    base_learners:
+      - name: "multinomial_lr"
+        type: "logistic_regression"
+        params:
+          max_iter: 2000
+          solver: "saga"
+          penalty: "l1"
+          C: 1.0
+          multi_class: "multinomial"
+          tol: 0.0001
+      
+      - name: "xgboost"
+        type: "xgboost"
+        params:
+          n_estimators: 100
+          max_depth: 6
+          learning_rate: 0.1
+          subsample: 0.8
+          colsample_bytree: 0.8
+          objective: "multi:softprob"
+          num_class: 4
+          eval_metric: "mlogloss"
+          tree_method: "hist"
+          grow_policy: "depthwise"
+      
+      - name: "lightgbm"
+        type: "lightgbm"
+        params:
+          n_estimators: 100
+          max_depth: 6
+          learning_rate: 0.1
+          subsample: 0.8
+          colsample_bytree: 0.8
+          objective: "multiclass"
+          num_class: 4
+          metric: "multi_logloss"
+          data_sample_strategy: "goss"
+          enable_bundle: true
+      
+      - name: "catboost"
+        type: "catboost"
+        params:
+          iterations: 100
+          depth: 6
+          learning_rate: 0.1
+          loss_function: "MultiClass"
+          classes_count: 4
+          verbose: false
+          grow_policy: "SymmetricTree"
+      
+      - name: "random_forest"
+        type: "random_forest"
+        params:
+          n_estimators: 100
+          max_depth: 10
+          min_samples_split: 5
+          min_samples_leaf: 2
+          max_features: "sqrt"
+      
+      - name: "mlp"
+        type: "mlp"
+        params:
+          hidden_layers: [128, 64]
+          dropout_rate: 0.3
+          activation: "relu"
+          epochs: 20
+          batch_size: 32
+          learning_rate: 0.001
+          early_stopping_patience: 5
+      
+      - name: "cnn1d"
+        type: "cnn1d"
+        params:
+          conv_layers:
+            - filters: 64
+              kernel_size: 3
+            - filters: 128
+              kernel_size: 3
+          dense_units: 64
+          dropout_rate: 0.3
+          epochs: 20
+          batch_size: 32
+          learning_rate: 0.001
+          early_stopping_patience: 5
+    
+    # 元学习器配置
+    meta_learner:
+      type: "elastic_net_logistic"
+      params:
+        penalty: "elasticnet"
+        solver: "saga"
+        l1_ratio: 0.5
+        C: 1.0
+        max_iter: 2000
+        multi_class: "multinomial"
+        tol: 0.0001
+    
+    # 交叉验证配置
+    cv:
+      n_splits: 5
+      shuffle: false  # 时序交叉验证，不按时间打乱
+    
+    # 数据划分
+    split_ratio:
+      train: 0.7
+      val: 0.2
+      test: 0.1
+    
+    # 模型保存路径
+    model_path: "models/stacking_risk_v1.pkl"
+    pipeline_path: "models/preprocessing_pipeline.pkl"
+  
+  # 风险等级映射
+  risk_levels:
+    - "蓝"
+    - "黄"
+    - "橙"
+    - "红"
+  
+  # 行业风险基准系数（示例）
+  industry_risk_coefficients:
+    default: 1.0
+    high_risk:
+      - "采矿业"
+      - "危险化学品"
+      - "金属冶炼"
+    medium_risk:
+      - "制造业"
+      - "建筑业"
+
+# Harness 配置
+harness:
+  # AgentFS 配置
+  agentfs:
+    db_path: "data/agentfs.db"
+    snapshot_interval: 3600  # 秒
+    git_repo_path: "data/agentfs_git"
+    snapshots_dir: "data/snapshots"
+  
+  # 记忆系统配置
+  memory:
+    short_term:
+      max_tokens: 180000
+      safety_threshold: 0.8  # 80%
+      cleanup_strategy: "lru"
+      priority_levels:
+        P0:
+          description: "核心指令/红线，永久保留"
+          retention: "permanent"
+        P1:
+          description: "高优先级，最后清理，摘要存入长期记忆"
+          retention: "summary"
+        P2:
+          description: "中优先级，优先压缩"
+          retention: "compress"
+        P3:
+          description: "低优先级，最先移除"
+          retention: "remove"
+    
+    long_term:
+      knowledge_files:
+        - "knowledge_base/工矿风险预警智能体合规执行书.md"
+        - "knowledge_base/部门分级审核SOP.md"
+        - "knowledge_base/工业物理常识及传感器时间序列逻辑.md"
+        - "knowledge_base/企业已具备的执行条件.md"
+        - "knowledge_base/类似事故处理案例.md"
+        - "knowledge_base/预警历史经验与短期记忆摘要.md"
+      
+      archive_files:
+        - "memory/核心指令归档.md"
+        - "memory/风险事件归档.md"
+        - "memory/处置经验归档.md"
+        - "memory/系统日志归档.md"
+      
+      rag:
+        embedding_model: "BAAI/bge-large-zh-v1.5"
+        reranker_model: "BAAI/bge-reranker-large"
+        top_k_retrieval: 10
+        top_k_rerank: 5
+        chunk_size: 300
+        chunk_overlap: 50
+  
+  # 三重校验配置
+  validation:
+    march:
+      enabled: true
+      check_levels:
+        - "合规红线校验"
+        - "工矿逻辑校验"
+        - "处置可行性校验"
+    
+    monte_carlo:
+      enabled: true
+      n_samples: 20
+      confidence_threshold: 0.85
+      risk_dimensions:
+        - name: "后果严重度"
+          levels: ["极低", "低", "中", "高", "极高"]
+        - name: "利益相关性"
+          levels: ["极低", "低", "中", "高", "极高"]
+        - name: "不可逆性"
+          levels: ["极低", "低", "中", "高", "极高"]
+  
+  # 模型迭代管控配置
+  model_iteration:
+    git_flow:
+      main_branch: "main"
+      dev_branch: "develop"
+      feature_branch_prefix: "feature/"
+      release_branch_prefix: "release/"
+    
+    ci:
+      enabled: true
+      pipeline:
+        - "code_lint"
+        - "system_load_test"
+        - "model_regression_test"
+      
+      regression:
+        min_f1_score: 0.85
+        comparison_metric: "f1_macro"
+    
+    approval:
+      levels:
+        - role: "安全监管负责人"
+          required: true
+        - role: "技术管理负责人"
+          required: true
+      
+      trial_period_hours: 24
+
+# API 配置
+api:
+  host: "0.0.0.0"
+  port: 8000
+  reload: false
+  workers: 1
+  docs_url: "/docs"
+  openapi_url: "/openapi.json"
+
+# 前端配置
+frontend:
+  port: 8501
+  title: "工矿企业风险预警智能体管控平台"
+  page_icon: "🏭"
+
+# 日志配置
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: "logs/system.log"
+  max_bytes: 10485760  # 10MB
+  backup_count: 5
+
+# LLM 配置
+llm:
+  glm5:
+    model: "glm-5"
+    api_key: "b58406e37c1247a78ff5e01e093d7370.1lBWG4vQJtQbPxAF"
+    base_url: "https://open.bigmodel.cn/api/paas/v4/"
+    default_temperature: 0.3
+    default_max_tokens: 8192
+    max_retries: 3
+
+# 场景化配置
+scenarios:
+  chemical:
+    name: "危险化学品"
+    kb_subdir: "knowledge_base/chemical"
+    prompt_template: "prompts/decision_v1_chemical.txt"
+    checker_strictness: "strict"
+    confidence_threshold: 0.90
+    risk_threshold: 2.2
+    memory_top_k: 5
+  metallurgy:
+    name: "冶金"
+    kb_subdir: "knowledge_base/metallurgy"
+    prompt_template: "prompts/decision_v1_metallurgy.txt"
+    checker_strictness: "standard"
+    confidence_threshold: 0.85
+    risk_threshold: 2.5
+    memory_top_k: 5
+  dust:
+    name: "粉尘涉爆"
+    kb_subdir: "knowledge_base/dust"
+    prompt_template: "prompts/decision_v1_dust.txt"
+    checker_strictness: "standard"
+    confidence_threshold: 0.85
+    risk_threshold: 2.5
+    memory_top_k: 5
+
+# 迭代配置
+iteration:
+  monitor:
+    sample_threshold: 5000
+    f1_threshold: 0.85
+    db_path: "data/audit.db"
+  approvers:
+    security: "security@mining-risk.gov.cn"
+    tech: "tech@mining-risk.gov.cn"
+  canary:
+    ratios: [0.0, 0.1, 0.5, 1.0]
+  staging:
+    duration_hours: 24
+    sample_interval_minutes: 5
+  smtp:
+    host: ""
+    port: 587
+    use_tls: true
+    username: ""
+    password: ""
+    from: "agent@mining-risk.gov.cn"
+  webhook_url: ""
+
+# 审计配置
+audit:
+  db_path: "data/audit.db"
+  retention_days: 365
+  auto_archive: true
