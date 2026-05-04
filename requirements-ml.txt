@@ -1,0 +1,9 @@
+# 模型训练 / 高级模型推理可选依赖
+# 仅在需要训练 Stacking 全量基学习器、SHAP 解释或完整回归测试时安装。
+
+xgboost>=2.0.0
+lightgbm>=4.0.0
+catboost>=1.2.0
+tensorflow>=2.13.0
+keras>=2.13.0
+shap>=0.42.0

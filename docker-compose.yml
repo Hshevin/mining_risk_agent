@@ -1,9 +1,19 @@
-version: "3.8"
+# =============================================================================
+# 工矿企业风险预警智能体 — 一键部署
+# - api:      FastAPI 后端（Python 3.10 + Uvicorn）
+# - frontend: React SPA（Vite 构建）+ Nginx 反向代理
+# =============================================================================
 
 services:
   api:
-    build: .
-    image: mining-risk-agent:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # 默认使用部署推理依赖：API 基础包 + 当前 pkl 推理必需 ML 包。
+        # 如需训练/RAG/旧 Streamlit，可改为 requirements-full.txt。
+        REQUIREMENTS_FILE: ${API_REQUIREMENTS_FILE:-requirements-deploy.txt}
+    image: mining-risk-agent-api:latest
     container_name: mining_risk_api
     ports:
       - "8000:8000"
@@ -12,35 +22,59 @@ services:
       - ./models:/app/models
       - ./logs:/app/logs
       - ./knowledge_base:/app/knowledge_base
+      - ./memory:/app/memory
     environment:
-      - PYTHONPATH=/app
-    command: uvicorn mining_risk_agent.api.main:app --host 0.0.0.0 --port 8000
+      PYTHONPATH: /app
+      PYTHONUNBUFFERED: "1"
+      # LLM / OpenAI 兼容 SDK 凭证（如需）。
+      # 任意自定义 provider 可通过通用 LLM_* 覆盖，或在 config.yaml 中配置 api_key_env 后透传对应变量。
+      LLM_PROVIDER: ${LLM_PROVIDER:-glm5}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_MODEL: ${LLM_MODEL:-}
+      LLM_BASE_URL: ${LLM_BASE_URL:-}
+      GLM5_API_KEY: ${GLM5_API_KEY:-}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      # 限制 native ML/RAG 依赖的线程池，降低 tokenizer/BLAS/OpenMP 组合崩溃风险。
+      TOKENIZERS_PARALLELISM: "false"
+      OMP_NUM_THREADS: "1"
+      OPENBLAS_NUM_THREADS: "1"
+      MKL_NUM_THREADS: "1"
+      NUMEXPR_NUM_THREADS: "1"
+    command: uvicorn api.main:app --host 0.0.0.0 --port 8000
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/health"]
       interval: 30s
       timeout: 10s
-      retries: 3
+      retries: 5
+      start_period: 30s
+    networks:
+      - mra_net
 
   frontend:
-    build: .
-    image: mining-risk-agent:latest
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    image: mining-risk-agent-frontend:latest
     container_name: mining_risk_frontend
     ports:
-      - "8501:8501"
-    volumes:
-      - ./data:/app/data
-      - ./models:/app/models
-      - ./frontend:/app/mining_risk_agent/frontend
-      - ./knowledge_base:/app/knowledge_base
-    environment:
-      - PYTHONPATH=/app
-    command: streamlit run mining_risk_agent/frontend/app.py --server.port 8501 --server.address 0.0.0.0
-    restart: unless-stopped
+      # 浏览器访问 http://localhost:8501
+      # 容器内 Nginx 监听 80
+      - "8501:80"
     depends_on:
-      - api
+      api:
+        condition: service_started
+    restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
+      test: ["CMD-SHELL", "wget -qO- http://localhost/ >/dev/null 2>&1 || exit 1"]
       interval: 30s
-      timeout: 10s
+      timeout: 5s
       retries: 3
+      start_period: 10s
+    networks:
+      - mra_net
+
+networks:
+  mra_net:
+    driver: bridge

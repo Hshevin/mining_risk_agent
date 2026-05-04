@@ -5,7 +5,7 @@
 
 import os
 from pathlib import Path
-from typing import Dict, Optional, Tuple
+from typing import TYPE_CHECKING, Dict, Optional, Tuple
 
 import joblib
 import numpy as np
@@ -16,12 +16,14 @@ from sklearn.model_selection import TimeSeriesSplit
 
 from data.loader import DataLoader
 from data.preprocessor import FeatureEngineeringPipeline
-from model.stacking import StackingRiskModel
 from utils.config import get_config
 from utils.exceptions import ModelTrainingError
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
+
+if TYPE_CHECKING:
+    from model.stacking import StackingRiskModel
 
 
 class StrictTimeSeriesSplit:
@@ -100,9 +102,13 @@ def load_and_merge_data(raw_path: Optional[str] = None) -> pd.DataFrame:
     return primary_table
 
 
-def sort_by_time(df: pd.DataFrame) -> pd.DataFrame:
+def sort_by_time(df: pd.DataFrame, preferred_time_col: Optional[str] = None) -> pd.DataFrame:
     """按时间列严格排序，确保时序一致性"""
-    time_candidates = ["时间戳", "创建时间", "登记时间", "检查时间", "timestamp", "create_time"]
+    time_candidates = [preferred_time_col] if preferred_time_col else []
+    time_candidates.extend(["report_time", "时间戳", "创建时间", "登记时间", "检查时间", "timestamp", "create_time"])
+    # 去重并过滤空值
+    seen = set()
+    time_candidates = [c for c in time_candidates if c and not (c in seen or seen.add(c))]
     for col in time_candidates:
         if col in df.columns:
             df[col] = pd.to_datetime(df[col], errors="coerce")
@@ -121,33 +127,35 @@ def prepare_features(df: pd.DataFrame, pipeline_path: Optional[str] = None) -> T
         (特征矩阵, 目标向量)
     """
     config = get_config()
-    
-    # 构造目标变量
-    risk_level_col = "风险等级"
-    safety_level_col = "安全生产标准化建设情况"
-    
-    if risk_level_col in df.columns:
-        # 映射风险等级
-        level_map = {"一级": 0, "二级": 1, "三级": 2, "四级": 3}
-        if pd.api.types.is_numeric_dtype(df[risk_level_col]):
-            y = df[risk_level_col].astype(int).clip(0, 3)
-        else:
-            y = df[risk_level_col].map(level_map).fillna(0).astype(int)
-    elif safety_level_col in df.columns:
-        # 使用安全生产标准化建设情况作为代理标签
-        # 0-1 -> 高风险, 2-3 -> 中风险, 4-5 -> 低风险
-        safety = df[safety_level_col].fillna(0).astype(int)
-        y = pd.Series(index=df.index, dtype=int)
-        y[safety <= 1] = 3  # 高风险
-        y[safety == 2] = 2  # 较高风险
-        y[safety == 3] = 1  # 中风险
-        y[safety >= 4] = 0  # 低风险
+    target_col = config.features.target_column
+    if target_col not in df.columns:
+        raise ModelTrainingError(f"数据中缺少目标列: {target_col}")
+
+    raw_target = df[target_col]
+    label_map = {"A": 0, "B": 1, "C": 2, "D": 3}
+
+    if pd.api.types.is_numeric_dtype(raw_target):
+        y = pd.to_numeric(raw_target, errors="coerce")
+        y = y.where(y.isin([0, 1, 2, 3]))
     else:
-        raise ModelTrainingError(f"数据中缺少可用的目标变量: {risk_level_col} 或 {safety_level_col}")
+        normalized = raw_target.astype(str).str.strip().str.upper()
+        normalized = normalized.where(~raw_target.isna(), None)
+        y = normalized.map(label_map)
+
+    valid_mask = y.notna()
+    dropped_rows = int((~valid_mask).sum())
+    if dropped_rows > 0:
+        logger.warning("目标列 '%s' 中有 %d 行无效标签，训练阶段将剔除", target_col, dropped_rows)
+
+    if not valid_mask.any():
+        raise ModelTrainingError(f"目标列 {target_col} 无有效标签，无法训练")
+
+    y = y.loc[valid_mask].astype(int)
+    feature_df = df.loc[valid_mask].copy()
     
     # 特征工程
     pipeline = FeatureEngineeringPipeline()
-    X = pipeline.fit_transform(df)
+    X = pipeline.fit_transform(feature_df)
     
     # 保存 Pipeline
     if pipeline_path:
@@ -187,7 +195,7 @@ def split_data(
 
 
 def evaluate_model(
-    model: StackingRiskModel,
+    model: "StackingRiskModel",
     X: pd.DataFrame,
     y: pd.Series,
     dataset_name: str = "test",
@@ -228,7 +236,7 @@ def train_and_save(
     raw_data_path: Optional[str] = None,
     model_path: Optional[str] = None,
     pipeline_path: Optional[str] = None,
-) -> StackingRiskModel:
+) -> "StackingRiskModel":
     """
     完整训练流程
 
@@ -242,11 +250,14 @@ def train_and_save(
     
     # 1. 加载数据
     logger.info("Step 1: 加载数据...")
-    df = load_and_merge_data(raw_data_path)
+    loader = DataLoader(raw_data_path=raw_data_path)
+    df = loader.load_merged_dataset()
     
     # 2. 严格时序排序
     logger.info("Step 2: 时序排序...")
-    df = sort_by_time(df)
+    special_features = getattr(config.features, "special_features", {}) or {}
+    preferred_time_col = special_features.get("time_col", "report_time")
+    df = sort_by_time(df, preferred_time_col=preferred_time_col)
     
     # 3. 特征工程
     logger.info("Step 3: 特征工程...")
@@ -270,6 +281,8 @@ def train_and_save(
     
     # 5. 训练模型（内部使用 5 折时序 CV 生成 OOF 元特征）
     logger.info("Step 5: 训练 Stacking 模型...")
+    from model.stacking import StackingRiskModel
+
     model = StackingRiskModel()
     model.fit(X_train_full, y_train_full)
     

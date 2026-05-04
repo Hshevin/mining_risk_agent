@@ -1,0 +1,13 @@
+# Docker API 部署推理依赖
+# 在精简 API 依赖基础上，补齐当前 Stacking pkl 反序列化与 predict_proba 必需包。
+# 不包含 RAG、旧 Streamlit 前端、测试/可视化依赖，避免镜像无谓膨胀。
+
+-r requirements.txt
+
+# 当前 models/stacking_risk_v1_stable.pkl 的树模型基学习器
+xgboost>=2.0.0
+lightgbm>=4.0.0
+catboost>=1.2.0
+
+# 当前模型配置包含 MLP / 1D-CNN 基学习器，加载已保存 Keras 模型需要 TensorFlow。
+tensorflow>=2.13.0

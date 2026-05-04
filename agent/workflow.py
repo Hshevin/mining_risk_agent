@@ -17,6 +17,7 @@ from jinja2 import Template
 from langgraph.graph import END, StateGraph
 from typing_extensions import TypedDict
 
+from data.field_normalizer import normalize_enterprise_record
 from data.preprocessor import FeatureEngineeringPipeline
 from harness.knowledge_base import KnowledgeBaseManager
 from harness.memory import HybridMemoryManager
@@ -24,7 +25,7 @@ from harness.monte_carlo import SamplingNode
 from harness.proposer import Proposer
 from harness.risk_assessment import RiskAssessor
 from harness.validation import run_march_validation
-from llm.glm5_client import GLM5Client
+from llm.glm5_client import OpenAICompatibleClient
 from model.stacking import StackingRiskModel
 from utils.config import get_config
 from utils.logger import get_logger
@@ -98,20 +99,18 @@ class ScenarioConfig:
         """从 config.yaml 加载 scenarios 配置，若不存在则返回默认值"""
         try:
             config = get_config()
-            if hasattr(config, "scenarios") and config.scenarios:
-                scenarios: Dict[str, Any] = {}
-                for sid, raw in config.scenarios.items():
-                    if isinstance(raw, dict):
-                        scenarios[sid] = {
-                            "name": raw.get("name", cls.DEFAULT_SCENARIOS.get(sid, {}).get("name", sid)),
-                            "kb_subdir": raw.get("kb_subdir", cls.DEFAULT_SCENARIOS.get(sid, {}).get("kb_subdir", f"knowledge_base/{sid}")),
-                            "prompt_template": raw.get("prompt_template", cls.DEFAULT_SCENARIOS.get(sid, {}).get("prompt_template", f"prompts/decision_v1_{sid}.txt")),
-                            "checker_strictness": raw.get("checker_strictness", "standard"),
-                            "confidence_threshold": raw.get("confidence_threshold", 0.85),
-                            "risk_threshold": raw.get("risk_threshold", 2.5),
-                            "memory_top_k": raw.get("memory_top_k", 5),
-                        }
-                return scenarios if scenarios else cls.DEFAULT_SCENARIOS
+            scenarios: Dict[str, Any] = {}
+            for sid, raw in config.scenarios.model_dump().items():
+                scenarios[sid] = {
+                    "name": raw.get("name", cls.DEFAULT_SCENARIOS.get(sid, {}).get("name", sid)),
+                    "kb_subdir": raw.get("kb_subdir", cls.DEFAULT_SCENARIOS.get(sid, {}).get("kb_subdir", f"knowledge_base/{sid}")),
+                    "prompt_template": raw.get("prompt_template", cls.DEFAULT_SCENARIOS.get(sid, {}).get("prompt_template", f"prompts/decision_v1_{sid}.txt")),
+                    "checker_strictness": raw.get("checker_strictness", "standard"),
+                    "confidence_threshold": raw.get("confidence_threshold", 0.85),
+                    "risk_threshold": raw.get("risk_threshold", 2.5),
+                    "memory_top_k": raw.get("memory_top_k", 5),
+                }
+            return scenarios if scenarios else cls.DEFAULT_SCENARIOS
         except Exception as e:
             logger.warning(f"从 config.yaml 加载 scenarios 失败: {e}，使用默认值")
         return cls.DEFAULT_SCENARIOS
@@ -236,8 +235,18 @@ async def node_data_ingestion(state: AgentState) -> AgentState:
     _push_node_status(state, "data_ingestion", "started")
     try:
         pipeline = _load_pipeline()
-        df = pd.DataFrame([state["raw_data"]])
-        df["企业ID"] = state["enterprise_id"]
+        normalized, report = normalize_enterprise_record(
+            state["raw_data"],
+            enterprise_id=state["enterprise_id"],
+            scenario_id=state.get("scenario_id"),
+        )
+        logger.info(
+            "Workflow 输入字段标准化完成: mapped=%s defaulted_count=%s",
+            report.mapped_fields,
+            len(report.defaulted_fields),
+        )
+        state["raw_data"] = normalized
+        df = pd.DataFrame([normalized])
         X = pipeline.transform(df)
         state["features"] = X
         _push_node_status(state, "data_ingestion", "completed", "特征工程完成")
@@ -252,6 +261,10 @@ async def node_risk_assessment(state: AgentState) -> AgentState:
     """风险评估节点：Stacking 模型预测"""
     _push_node_status(state, "risk_assessment", "started")
     try:
+        if state.get("error") or state.get("features") is None:
+            detail = state.get("error") or "缺少特征矩阵，跳过模型推理"
+            _push_node_status(state, "risk_assessment", "skipped", detail)
+            return state
         model = _load_model()
         X = state["features"]
         result = model.predict(X)
@@ -284,6 +297,12 @@ async def node_memory_recall(state: AgentState) -> AgentState:
         query = "、".join(top_features) if top_features else "风险预警处置"
 
         memory = _get_memory()
+        if not memory.is_long_term_rag_enabled():
+            state["memory_results"] = []
+            logger.info("长期记忆 RAG 已关闭，memory_recall 跳过向量召回")
+            _push_node_status(state, "memory_recall", "skipped", "长期记忆 RAG 已关闭，跳过向量召回")
+            return state
+
         risk_level = prediction.get("predicted_level", "")
         results = await memory.recall_long_term(query, risk_level=risk_level, top_k=5)
 
@@ -292,6 +311,10 @@ async def node_memory_recall(state: AgentState) -> AgentState:
             state, "memory_recall", "completed",
             f"召回 {len(results)} 条记忆"
         )
+    except ImportError as e:
+        logger.warning(f"记忆召回跳过: {e}")
+        state["memory_results"] = []
+        _push_node_status(state, "memory_recall", "skipped", str(e))
     except Exception as e:
         logger.error(f"记忆召回失败: {e}")
         state["memory_results"] = []
@@ -345,8 +368,22 @@ async def node_decision_generation(state: AgentState, scenario: ScenarioConfig) 
             physics_context=physics_context,
         )
 
-        client = GLM5Client()
-        decision = await client.generate_json(prompt, temperature=0.3)
+        config = get_config()
+        llm_cfg = config.llm.active
+        client = OpenAICompatibleClient(
+            api_key=llm_cfg.api_key or None,
+            base_url=llm_cfg.base_url or None,
+            model=llm_cfg.model or None,
+            provider_name=config.llm.provider,
+            api_key_env=llm_cfg.api_key_env or None,
+            max_retries=llm_cfg.max_retries,
+            default_max_tokens=llm_cfg.default_max_tokens,
+        )
+        decision = await client.generate_json(
+            prompt,
+            temperature=llm_cfg.default_temperature,
+            max_tokens=llm_cfg.default_max_tokens,
+        )
         state["decision"] = decision
 
         # ------------------------------------------------------------------
@@ -387,7 +424,11 @@ async def node_decision_generation(state: AgentState, scenario: ScenarioConfig) 
                 f"{march_reason}\n\n"
                 f"请根据上述反馈修正决策方案，确保符合安全规范，重新输出 JSON。"
             )
-            decision = await client.generate_json(correction_prompt, temperature=0.3)
+            decision = await client.generate_json(
+                correction_prompt,
+                temperature=llm_cfg.default_temperature,
+                max_tokens=llm_cfg.default_max_tokens,
+            )
             state["decision"] = decision
 
         state["retry_count"] = retry_count
@@ -454,7 +495,7 @@ async def node_result_push(state: AgentState) -> AgentState:
     """结果推送节点：封装最终输出"""
     _push_node_status(state, "result_push", "started")
     try:
-        decision = state.get("decision", {})
+        decision = state.get("decision") or {}
         final_status = state.get("final_status", "UNKNOWN")
 
         if "government_intervention" not in decision:
@@ -516,6 +557,15 @@ class DecisionWorkflow:
         async def _decision_wrapper(state: AgentState) -> AgentState:
             return await node_decision_generation(state, self.scenario)
 
+        def _route_after_data(state: AgentState) -> str:
+            return "continue" if state.get("features") is not None and not state.get("error") else "end"
+
+        def _route_after_risk(state: AgentState) -> str:
+            return "continue" if state.get("prediction") is not None and not state.get("error") else "end"
+
+        def _route_after_decision(state: AgentState) -> str:
+            return "continue" if state.get("decision") is not None and not state.get("error") else "end"
+
         workflow.add_node("data_ingestion", node_data_ingestion)
         workflow.add_node("risk_assessment", node_risk_assessment)
         workflow.add_node("memory_recall", node_memory_recall)
@@ -523,10 +573,22 @@ class DecisionWorkflow:
         workflow.add_node("result_push", node_result_push)
 
         workflow.set_entry_point("data_ingestion")
-        workflow.add_edge("data_ingestion", "risk_assessment")
-        workflow.add_edge("risk_assessment", "memory_recall")
+        workflow.add_conditional_edges(
+            "data_ingestion",
+            _route_after_data,
+            {"continue": "risk_assessment", "end": END},
+        )
+        workflow.add_conditional_edges(
+            "risk_assessment",
+            _route_after_risk,
+            {"continue": "memory_recall", "end": END},
+        )
         workflow.add_edge("memory_recall", "decision_generation")
-        workflow.add_edge("decision_generation", "result_push")
+        workflow.add_conditional_edges(
+            "decision_generation",
+            _route_after_decision,
+            {"continue": "result_push", "end": END},
+        )
         workflow.add_edge("result_push", END)
 
         return workflow.compile()

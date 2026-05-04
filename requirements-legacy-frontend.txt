@@ -1,0 +1,6 @@
+# 旧版 Streamlit 前端可选依赖
+# 当前默认前端已迁移到 frontend/package.json 的 React/Vite 工程。
+# 仅在运行 frontend/app_legacy_streamlit.py 时安装。
+
+streamlit>=1.28.0
+plotly>=5.17.0

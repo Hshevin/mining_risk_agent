@@ -14,12 +14,13 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
+from data.field_normalizer import normalize_enterprise_record
 from agent.workflow import DecisionWorkflow
 from data.preprocessor import FeatureEngineeringPipeline
 from harness.memory import HybridMemoryManager
 from harness.validation import ValidationPipeline
 from model.stacking import StackingRiskModel
-from utils.config import get_config
+from utils.config import LLMProviderConfig, get_config
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -151,6 +152,29 @@ class ScenarioSwitchResponse(BaseModel):
     memory_top_k: int
 
 
+class LLMConfigResponse(BaseModel):
+    provider: str
+    model: str
+    base_url: str
+    default_temperature: float
+    default_max_tokens: int
+    max_retries: int
+    has_api_key: bool
+    available_providers: List[str] = Field(default_factory=list)
+    message: str = ""
+
+
+class LLMUpdateRequest(BaseModel):
+    provider: str
+    model: Optional[str] = None
+    base_url: Optional[str] = None
+    api_key: Optional[str] = None
+    api_key_env: Optional[str] = None
+    default_temperature: Optional[float] = None
+    default_max_tokens: Optional[int] = None
+    max_retries: Optional[int] = None
+
+
 # =============================================================================
 # Mock 数据生成器（当 Workflow 不可用时降级返回）
 # =============================================================================
@@ -223,9 +247,18 @@ async def predict(request: PredictRequest) -> PredictResponse:
     try:
         model = _load_model()
         pipeline = _load_pipeline()
-        
-        df = pd.DataFrame([request.data])
-        df["企业ID"] = request.enterprise_id
+
+        normalized, report = normalize_enterprise_record(
+            request.data,
+            enterprise_id=request.enterprise_id,
+        )
+        logger.info(
+            "预测输入字段标准化完成: mapped=%s defaulted_count=%s",
+            report.mapped_fields,
+            len(report.defaulted_fields),
+        )
+
+        df = pd.DataFrame([normalized])
         
         X = pipeline.transform(df)
         
@@ -415,6 +448,7 @@ async def _decision_stream(
     """SSE 流式输出决策工作流节点状态"""
     try:
         workflow = _get_workflow()
+        final_state: Dict[str, Any] = {}
         # 使用 astream 获取中间状态流
         async for state in workflow.graph.astream({
             "enterprise_id": enterprise_id,
@@ -434,18 +468,22 @@ async def _decision_stream(
         }):
             # state 是 dict，key 为节点名，value 为 AgentState
             for node_name, node_state in state.items():
+                if not isinstance(node_state, dict):
+                    continue
+                final_state = node_state
                 node_status_list = node_state.get("node_status", [])
                 if node_status_list:
                     latest = node_status_list[-1]
                     yield f"data: {_json.dumps(latest, ensure_ascii=False)}\n\n"
 
-        # 最终输出完整结果
-        final_state = await workflow.run_async(enterprise_id=enterprise_id, raw_data=raw_data)
+        # astream 已经执行完整工作流，避免再次 run_async 造成重复日志与重复模型调用。
+        prediction = final_state.get("prediction") or {}
         summary = {
             "node": "workflow",
-            "status": "completed",
+            "status": "failed" if final_state.get("error") else "completed",
             "final_status": final_state.get("final_status"),
-            "predicted_level": final_state.get("prediction", {}).get("predicted_level"),
+            "predicted_level": prediction.get("predicted_level"),
+            "error": final_state.get("error"),
         }
         yield f"data: {_json.dumps(summary, ensure_ascii=False)}\n\n"
     except Exception as e:
@@ -461,6 +499,76 @@ async def decision_stream(request: DecisionRequest) -> StreamingResponse:
         _decision_stream(request.enterprise_id, request.data),
         media_type="text/event-stream",
     )
+
+
+def _build_llm_config_response(message: str = "") -> LLMConfigResponse:
+    config = get_config()
+    llm_cfg = config.llm.active
+    return LLMConfigResponse(
+        provider=config.llm.provider,
+        model=llm_cfg.model,
+        base_url=llm_cfg.base_url,
+        default_temperature=llm_cfg.default_temperature,
+        default_max_tokens=llm_cfg.default_max_tokens,
+        max_retries=llm_cfg.max_retries,
+        has_api_key=bool(llm_cfg.api_key),
+        available_providers=config.llm.available_provider_names,
+        message=message,
+    )
+
+
+@agent_router.get("/llm", response_model=LLMConfigResponse)
+async def get_llm_config() -> LLMConfigResponse:
+    """返回当前 LLM 提供方与模型配置，供前端展示。"""
+    return _build_llm_config_response()
+
+
+@agent_router.post("/llm/{provider}", response_model=LLMConfigResponse)
+async def switch_llm_provider(provider: str) -> LLMConfigResponse:
+    """
+    切换当前运行时 LLM 提供方。
+    provider 来自配置中的 llm.providers，或由前端自定义创建。
+    该切换只影响当前后端进程，重启后仍以配置文件或环境变量为准。
+    """
+    normalized = provider.lower()
+
+    try:
+        config = get_config()
+        if normalized not in config.llm.providers:
+            config.llm.providers[normalized] = LLMProviderConfig(model=normalized)
+        config.llm.provider = normalized
+        logger.info(f"LLM provider 已切换为: {normalized}")
+        return _build_llm_config_response(f"LLM 已切换为 {normalized}")
+    except Exception as e:
+        logger.error(f"LLM provider 切换失败: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@agent_router.post("/llm", response_model=LLMConfigResponse)
+async def update_llm_config(request: LLMUpdateRequest) -> LLMConfigResponse:
+    """
+    创建或更新任意 OpenAI 兼容 LLM provider，并切换为当前运行时配置。
+    不持久化写回 config.yaml；如需重启后保留，请同步写入配置文件或环境变量。
+    """
+    provider = request.provider.strip().lower()
+    if not provider:
+        raise HTTPException(status_code=400, detail="provider 不能为空")
+
+    try:
+        config = get_config()
+        current = config.llm.providers.get(provider, LLMProviderConfig())
+        updates = request.model_dump(exclude_unset=True)
+        updates.pop("provider", None)
+        for key, value in updates.items():
+            if value is not None:
+                setattr(current, key, value)
+        config.llm.providers[provider] = current
+        config.llm.provider = provider
+        logger.info(f"LLM provider 已更新并切换为: {provider}")
+        return _build_llm_config_response(f"LLM 配置已更新为 {provider}")
+    except Exception as e:
+        logger.error(f"LLM 配置更新失败: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @agent_router.post("/scenario/{scenario_id}", response_model=ScenarioSwitchResponse)

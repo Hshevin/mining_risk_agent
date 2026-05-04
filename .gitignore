@@ -1,0 +1,30 @@
+# Python caches and test artifacts
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+
+# Runtime data
+logs/*.log
+data/*.db
+data/chroma_db/
+
+# Training intermediates
+catboost_info/
+
+# Frontend build artifacts
+frontend/node_modules/
+frontend/dist/
+frontend/dist-tsbuild-node/
+frontend/.vite/
+frontend/*.tsbuildinfo
+
+# OS files
+.DS_Store

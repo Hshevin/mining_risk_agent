@@ -1,0 +1,672 @@
+/* =============================================================================
+   SCADA 工业控制室风格 — 全局样式
+   迁移自原 Streamlit 前端 frontend/app.py 内联 CSS
+   ============================================================================= */
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  padding: 0;
+  background-color: #0a0e1a;
+  color: #e5e7eb;
+  font-family: "Inter", "Noto Sans SC", "PingFang SC", "Microsoft YaHei",
+    sans-serif;
+  min-height: 100vh;
+}
+
+a {
+  color: #3b82f6;
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+button {
+  font-family: inherit;
+}
+
+input,
+textarea,
+select {
+  font-family: inherit;
+}
+
+.font-mono {
+  font-family: "JetBrains Mono", "Roboto Mono", "SF Mono", "Courier New",
+    monospace;
+}
+
+/* ─── 应用骨架 ─── */
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.system-status-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #0f172a;
+  border-bottom: 1px solid #374151;
+  padding: 6px 20px;
+  font-size: 12px;
+  color: #9ca3af;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.status-bar-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.status-dot.online {
+  background: #10b981;
+  box-shadow: 0 0 6px #10b981;
+}
+
+.status-dot.offline {
+  background: #ef4444;
+  box-shadow: 0 0 6px #ef4444;
+}
+
+.status-dot.warn {
+  background: #eab308;
+  box-shadow: 0 0 6px #eab308;
+}
+
+.app-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.sidebar {
+  width: 240px;
+  background: #0f172a;
+  border-right: 1px solid #1f2937;
+  padding: 16px;
+  flex-shrink: 0;
+}
+
+.main-content {
+  flex: 1;
+  padding: 16px 24px;
+  min-width: 0;
+  overflow-x: hidden;
+}
+
+.sidebar-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #e5e7eb;
+  margin-bottom: 4px;
+}
+
+.sidebar-subtitle {
+  font-size: 10px;
+  color: #6b7280;
+  letter-spacing: 0.1em;
+  margin-bottom: 16px;
+}
+
+.sidebar-section-title {
+  font-size: 11px;
+  color: #9ca3af;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.sidebar-divider {
+  border-top: 1px solid #1f2937;
+  margin: 12px 0;
+}
+
+/* ─── 卡片 ─── */
+.scada-card {
+  background: #1f2937;
+  border: 1px solid #374151;
+  border-radius: 10px;
+  padding: 16px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.scada-card:hover {
+  transform: scale(1.02);
+  box-shadow: 0 0 20px rgba(59, 130, 246, 0.12);
+}
+
+.scada-card-title {
+  font-size: 12px;
+  color: #9ca3af;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+
+.scada-card-value {
+  font-family: "JetBrains Mono", "Roboto Mono", monospace;
+  font-size: 32px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.scada-card-sub {
+  font-size: 12px;
+  color: #6b7280;
+  margin-top: 4px;
+}
+
+/* ─── 风险颜色 ─── */
+.glow-red {
+  color: #ef4444;
+  text-shadow: 0 0 12px rgba(239, 68, 68, 0.45);
+}
+
+.glow-orange {
+  color: #f97316;
+  text-shadow: 0 0 12px rgba(249, 115, 22, 0.35);
+}
+
+.glow-yellow {
+  color: #eab308;
+  text-shadow: 0 0 12px rgba(234, 179, 8, 0.35);
+}
+
+.glow-blue {
+  color: #3b82f6;
+  text-shadow: 0 0 12px rgba(59, 130, 246, 0.35);
+}
+
+.glow-green {
+  color: #10b981;
+  text-shadow: 0 0 12px rgba(16, 185, 129, 0.35);
+}
+
+.glow-white {
+  color: #f3f4f6;
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.15);
+}
+
+/* ─── 红级脉冲动画 ─── */
+@keyframes pulse-red {
+  0% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.55);
+  }
+  50% {
+    box-shadow: 0 0 0 16px rgba(239, 68, 68, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+  }
+}
+
+.risk-red-pulse {
+  animation: pulse-red 2s infinite ease-in-out;
+}
+
+/* ─── 按钮 ─── */
+.scada-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: linear-gradient(135deg, #3b82f6 0%, #06b6d4 100%);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 22px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+
+.scada-btn:hover:not(:disabled) {
+  opacity: 0.95;
+  transform: translateY(-1px);
+}
+
+.scada-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.scada-btn.secondary {
+  background: #1f2937;
+  border: 1px solid #374151;
+  color: #e5e7eb;
+}
+
+.scada-btn.full-width {
+  width: 100%;
+}
+
+/* ─── 表单控件 ─── */
+.scada-input,
+.scada-textarea,
+.scada-select {
+  width: 100%;
+  background: #111827;
+  border: 1px solid #374151;
+  border-radius: 6px;
+  color: #e5e7eb;
+  padding: 8px 10px;
+  font-size: 13px;
+  outline: none;
+}
+
+.scada-input:focus,
+.scada-textarea:focus,
+.scada-select:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+.scada-textarea {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 12px;
+  resize: vertical;
+}
+
+.scada-label {
+  font-size: 12px;
+  color: #9ca3af;
+  margin-bottom: 4px;
+  display: block;
+}
+
+/* ─── 标签页 ─── */
+.tabs-bar {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid #1f2937;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.tab-button {
+  background: transparent;
+  border: none;
+  color: #9ca3af;
+  padding: 10px 18px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.tab-button:hover {
+  color: #e5e7eb;
+}
+
+.tab-button.active {
+  color: #3b82f6;
+  border-bottom-color: #3b82f6;
+}
+
+/* ─── 决策建议卡 ─── */
+.advice-card {
+  background: #111827;
+  border: 1px solid #1f2937;
+  border-left: 3px solid #3b82f6;
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 8px;
+}
+
+.advice-card-title {
+  font-size: 12px;
+  color: #9ca3af;
+  font-weight: 600;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* ─── 校验拦截卡片 ─── */
+.validation-card {
+  background: #111827;
+  border-radius: 8px;
+  padding: 14px;
+  border: 1px solid #1f2937;
+}
+
+.validation-card.passed {
+  border-color: #10b98144;
+  background: rgba(16, 185, 129, 0.05);
+}
+
+.validation-card.failed {
+  border-color: #ef444444;
+  background: rgba(239, 68, 68, 0.05);
+}
+
+.validation-card .v-title {
+  font-size: 12px;
+  color: #9ca3af;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.validation-card .v-status {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.validation-card .v-detail {
+  font-size: 12px;
+  color: #6b7280;
+  margin-top: 4px;
+}
+
+/* ─── 时间线 ─── */
+.timeline-container {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.timeline-node {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: #111827;
+  border-radius: 6px;
+  border-left: 3px solid #6b7280;
+}
+
+.timeline-node.completed {
+  border-left-color: #10b981;
+}
+
+.timeline-node.failed {
+  border-left-color: #ef4444;
+}
+
+.timeline-node.running {
+  border-left-color: #3b82f6;
+  animation: pulse-blue 1.5s infinite;
+}
+
+@keyframes pulse-blue {
+  0%,
+  100% {
+    box-shadow: 0 0 0 rgba(59, 130, 246, 0);
+  }
+  50% {
+    box-shadow: 0 0 12px rgba(59, 130, 246, 0.4);
+  }
+}
+
+.node-name {
+  font-size: 13px;
+  color: #e5e7eb;
+  font-weight: 600;
+}
+
+.node-detail {
+  font-size: 11px;
+  color: #6b7280;
+  font-family: "JetBrains Mono", monospace;
+  margin-top: 2px;
+}
+
+/* ─── 进度条 ─── */
+.scada-progress-track {
+  width: 100%;
+  height: 12px;
+  background: #1f2937;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid #374151;
+}
+
+.scada-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #3b82f6, #06b6d4);
+  transition: width 0.3s ease;
+}
+
+/* ─── JSON 编辑器风格 ─── */
+.json-code-block {
+  background: #0f172a;
+  border: 1px solid #1f2937;
+  border-radius: 6px;
+  padding: 12px;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 12px;
+  color: #e5e7eb;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 480px;
+  overflow-y: auto;
+}
+
+.json-key {
+  color: #60a5fa;
+}
+
+.json-bool {
+  color: #f97316;
+}
+
+/* ─── 记忆卡 ─── */
+.memory-card {
+  background: #111827;
+  border-left: 3px solid #6b7280;
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* ─── Spinner ─── */
+.tech-spinner {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: 3px solid #1f2937;
+  border-top-color: #3b82f6;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ─── 布局工具 ─── */
+.row {
+  display: grid;
+  gap: 12px;
+}
+
+.row.cols-2 {
+  grid-template-columns: 1fr 1fr;
+}
+
+.row.cols-3 {
+  grid-template-columns: 1fr 1fr 1fr;
+}
+
+.row.cols-4 {
+  grid-template-columns: 1fr 1fr 1fr 1fr;
+}
+
+.row.predict {
+  grid-template-columns: minmax(280px, 1fr) 3fr;
+}
+
+@media (max-width: 1100px) {
+  .row.cols-2,
+  .row.cols-3,
+  .row.cols-4,
+  .row.predict {
+    grid-template-columns: 1fr;
+  }
+}
+
+.section-title {
+  font-size: 13px;
+  color: #9ca3af;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+  margin: 8px 0 12px;
+}
+
+.subtitle {
+  font-size: 12px;
+  color: #9ca3af;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+  margin: 12px 0 8px;
+}
+
+.divider {
+  border-top: 1px solid #1f2937;
+  margin: 16px 0;
+}
+
+.alert {
+  padding: 10px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  margin-bottom: 10px;
+}
+
+.alert.info {
+  background: rgba(59, 130, 246, 0.08);
+  border: 1px solid #3b82f644;
+  color: #93c5fd;
+}
+
+.alert.success {
+  background: rgba(16, 185, 129, 0.08);
+  border: 1px solid #10b98144;
+  color: #6ee7b7;
+}
+
+.alert.warning {
+  background: rgba(234, 179, 8, 0.08);
+  border: 1px solid #eab30844;
+  color: #fde68a;
+}
+
+.alert.error {
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid #ef444444;
+  color: #fca5a5;
+}
+
+.mock-tag {
+  display: inline-block;
+  background: #f97316;
+  color: #fff;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: bold;
+  margin-left: 8px;
+}
+
+.empty-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 20px;
+  color: #374151;
+  font-size: 14px;
+  text-align: center;
+}
+
+.scada-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  background: #111827;
+  border: 1px solid #1f2937;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.scada-table th,
+.scada-table td {
+  text-align: left;
+  padding: 10px 12px;
+  border-bottom: 1px solid #1f2937;
+}
+
+.scada-table th {
+  color: #9ca3af;
+  font-weight: 600;
+  background: #0f172a;
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+}
+
+.scada-table tr:last-child td {
+  border-bottom: none;
+}
+
+.kb-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+  max-height: 240px;
+  overflow-y: auto;
+  border: 1px solid #1f2937;
+  border-radius: 6px;
+}
+
+.kb-item {
+  background: #111827;
+  border: none;
+  border-bottom: 1px solid #1f2937;
+  color: #e5e7eb;
+  padding: 8px 12px;
+  text-align: left;
+  cursor: pointer;
+  font-size: 13px;
+  font-family: inherit;
+}
+
+.kb-item:hover,
+.kb-item.active {
+  background: #1f2937;
+  color: #3b82f6;
+}
+
+.kb-item:last-child {
+  border-bottom: none;
+}

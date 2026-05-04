@@ -15,11 +15,23 @@
 
 import os
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
-import chromadb
-from chromadb.config import Settings
-from sentence_transformers import SentenceTransformer
+try:
+    import chromadb
+    from chromadb.config import Settings
+    _CHROMADB_IMPORT_ERROR = None
+except Exception as e:
+    chromadb = None
+    Settings = None
+    _CHROMADB_IMPORT_ERROR = e
+
+try:
+    from sentence_transformers import SentenceTransformer
+    _SENTENCE_TRANSFORMERS_IMPORT_ERROR = None
+except Exception as e:
+    SentenceTransformer = None
+    _SENTENCE_TRANSFORMERS_IMPORT_ERROR = e
 
 from utils.config import get_config
 from utils.logger import get_logger
@@ -197,6 +209,14 @@ class VectorStore:
             persist_directory = "data/chroma_db"
         self.persist_directory = persist_directory
         os.makedirs(persist_directory, exist_ok=True)
+
+        if chromadb is None or Settings is None:
+            detail = f" 原始错误: {_CHROMADB_IMPORT_ERROR}" if _CHROMADB_IMPORT_ERROR else ""
+            raise ImportError(
+                "VectorStore 需要可选依赖 chromadb。"
+                "请安装 `pip install -r requirements-rag.txt` 或 `pip install -r requirements-full.txt`。"
+                f"{detail}"
+            )
         
         self.client = chromadb.PersistentClient(
             path=persist_directory,
@@ -205,9 +225,19 @@ class VectorStore:
         self.collection = self.client.get_or_create_collection(name=collection_name)
         
         # 嵌入模型（延迟加载）
-        self._embedding_model: Optional[SentenceTransformer] = None
+        self._embedding_model: Optional[Any] = None
 
-    def _get_embedding_model(self) -> SentenceTransformer:
+    def _get_embedding_model(self) -> Any:
+        if SentenceTransformer is None:
+            detail = (
+                f" 原始错误: {_SENTENCE_TRANSFORMERS_IMPORT_ERROR}"
+                if _SENTENCE_TRANSFORMERS_IMPORT_ERROR else ""
+            )
+            raise ImportError(
+                "VectorStore.embed 需要可选依赖 sentence-transformers。"
+                "请安装 `pip install -r requirements-rag.txt` 或 `pip install -r requirements-full.txt`。"
+                f"{detail}"
+            )
         if self._embedding_model is None:
             logger.info(f"加载嵌入模型: {self.embedding_model_name}")
             self._embedding_model = SentenceTransformer(self.embedding_model_name)

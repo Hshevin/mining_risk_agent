@@ -1,0 +1,14 @@
+# RAG / NLP 可选依赖
+# 体积较大：包含 sentence-transformers、ChromaDB、PyTorch。
+# API 镜像默认不安装；调用 VectorStore、Reranker、BERT-CRF NER 时再安装。
+# 约束上界避免解析到未验证的 native wheel 组合。
+
+sentence-transformers>=2.7.0,<3.0.0
+transformers>=4.41.0,<5.0.0
+tokenizers>=0.19.0,<0.21.0
+safetensors>=0.4.0,<0.5.0
+torch>=2.3.0,<2.5.0
+chromadb>=0.5.0,<0.6.0
+onnxruntime>=1.18.0,<1.20.0
+faiss-cpu>=1.8.0,<1.9.0
+pytorch-crf>=0.7.0

@@ -76,10 +76,14 @@ class NumericTransformer(BaseEstimator, TransformerMixin):
         self.use_log = use_log
         self.scaler = MinMaxScaler()
         self.upper_bounds_: Dict[str, float] = {}
+        self.fill_values_: Dict[str, float] = {}
 
     def fit(self, X: pd.DataFrame, y=None):
         for col in X.columns:
-            upper = X[col].quantile(self.clip_quantile)
+            series = pd.to_numeric(X[col], errors="coerce")
+            upper = series.quantile(self.clip_quantile)
+            mean_val = series.mean()
+            self.fill_values_[col] = 0.0 if pd.isna(mean_val) else float(mean_val)
             self.upper_bounds_[col] = upper
         # 拟合 scaler（使用截断后的数据）
         X_clipped = self._clip_and_transform(X, fit=True)
@@ -97,7 +101,12 @@ class NumericTransformer(BaseEstimator, TransformerMixin):
             if col in self.upper_bounds_:
                 result[col] = result[col].clip(upper=self.upper_bounds_[col])
             # 填充缺失
-            mean_val = result[col].mean()
+            if fit:
+                mean_val = result[col].mean()
+                mean_val = 0.0 if pd.isna(mean_val) else float(mean_val)
+                self.fill_values_[col] = mean_val
+            else:
+                mean_val = self.fill_values_.get(col, 0.0)
             result[col] = result[col].fillna(mean_val)
             # 对数变换（处理正值）
             if self.use_log:
@@ -439,10 +448,12 @@ class TimeDecayWeightTransformer(BaseEstimator, TransformerMixin):
         time_col: Optional[str] = None,
         value_cols: Optional[List[str]] = None,
         reference_year: Optional[int] = None,
+        missing_time_weight: float = 1.0,
     ):
         self.time_col = time_col
         self.value_cols = value_cols or []
         self.reference_year = reference_year
+        self.missing_time_weight = missing_time_weight
 
     def fit(self, X: pd.DataFrame, y=None):
         if self.time_col is None:
@@ -466,7 +477,7 @@ class TimeDecayWeightTransformer(BaseEstimator, TransformerMixin):
         ref = self.reference_year or (pd.Timestamp.now().year)
 
         year_diff = (ref - years).clip(lower=0)
-        weights = year_diff.map({0: 1.0, 1: 0.7}).fillna(0.5)
+        weights = year_diff.map({0: 1.0, 1: 0.7}).fillna(self.missing_time_weight)
         # 超过两年统一 0.5
         weights[year_diff >= 2] = 0.5
 
@@ -756,54 +767,92 @@ class FeatureEngineeringPipeline:
         if industry_cols:
             transformers.append(("industry", IndustryRiskCoefficient(), industry_cols))
 
-        # ===== 特殊逻辑特征工程 =====
+        # ===== 特殊逻辑特征工程（使用 config.special_features 明确列名） =====
+        avail = set(available_columns or [])
+        sf = getattr(self.config, "special_features", {}) or {}
+
         # 干湿除尘比例
-        dust_cols = [c for c in (available_columns or []) if "除尘" in c]
+        dust_cfg = sf.get("dust_removal", {})
+        dry_col = dust_cfg.get("dry_col", "dust_ganshi_num")
+        wet_col = dust_cfg.get("wet_col", "dust_shishi_num")
+        dust_cols = [c for c in [dry_col, wet_col] if c in avail]
         if dust_cols:
-            transformers.append(("dust_ratio", DustRemovalRatioTransformer(), dust_cols))
+            transformers.append((
+                "dust_ratio",
+                DustRemovalRatioTransformer(dry_col=dry_col, wet_col=wet_col),
+                dust_cols,
+            ))
 
         # 有限空间 OR 逻辑
-        confined_cols = [c for c in (available_columns or []) if any(k in c for k in ["有限空间", "密闭空间", "受限空间", "空间作业"])]
+        confined_cols = [c for c in sf.get("confined_space_cols", []) if c in avail]
         if confined_cols:
-            transformers.append(("confined_space", ConfinedSpaceORTransformer(cols=confined_cols), confined_cols))
+            transformers.append((
+                "confined_space",
+                ConfinedSpaceORTransformer(cols=confined_cols),
+                confined_cols,
+            ))
 
         # 危化品 OR 逻辑
-        chem_cols = [c for c in (available_columns or []) if any(k in c for k in ["危化品", "危险化学品", "化学品"])]
+        chem_cols = [c for c in sf.get("hazardous_chemical_cols", []) if c in avail]
         if chem_cols:
-            transformers.append(("hazardous_chem", HazardousChemicalORTransformer(cols=chem_cols), chem_cols))
+            transformers.append((
+                "hazardous_chem",
+                HazardousChemicalORTransformer(cols=chem_cols),
+                chem_cols,
+            ))
 
-        # 时间衰减加权：自动探测数值列（排除ID类）
-        time_col = None
-        for c in available_columns or []:
-            if "时间" in c or "年份" in c or "year" in c.lower():
-                time_col = c
-                break
-        if time_col:
-            value_candidates = [c for c in (available_columns or []) if c not in binary_cols + enum_cols + text_cols + industry_cols and c != time_col]
-            # 只选择少量数值列避免维度爆炸
-            decay_value_cols = [c for c in value_candidates if any(k in c for k in ["隐患", "事故", "风险", "处罚", "检查", "投入"])]
-            if decay_value_cols:
-                transformers.append(("time_decay", TimeDecayWeightTransformer(time_col=time_col, value_cols=decay_value_cols), [time_col] + decay_value_cols))
+        # 时间衰减加权
+        time_col = sf.get("time_col", "report_time")
+        decay_value_cols = [c for c in sf.get("time_decay_value_cols", []) if c in avail]
+        missing_time_weight = float(sf.get("time_decay_missing_weight", 1.0))
+        if time_col in avail and decay_value_cols:
+            transformers.append((
+                "time_decay",
+                TimeDecayWeightTransformer(
+                    time_col=time_col,
+                    value_cols=decay_value_cols,
+                    missing_time_weight=missing_time_weight,
+                ),
+                [time_col] + decay_value_cols,
+            ))
 
-        # 地理围栏：探测经纬度列
-        lon_col = next((c for c in (available_columns or []) if "经度" in c or "lon" in c.lower()), None)
-        lat_col = next((c for c in (available_columns or []) if "纬度" in c or "lat" in c.lower()), None)
-        if lon_col and lat_col:
-            transformers.append(("geo_fence", GeoFenceTransformer(lon_col=lon_col, lat_col=lat_col), [lon_col, lat_col]))
+        # 地理围栏
+        geo_cfg = sf.get("geo_fence", {})
+        lon_col = geo_cfg.get("lon_col", "dir_longitude")
+        lat_col = geo_cfg.get("lat_col", "dir_latitude")
+        if lon_col in avail and lat_col in avail:
+            transformers.append((
+                "geo_fence",
+                GeoFenceTransformer(lon_col=lon_col, lat_col=lat_col),
+                [lon_col, lat_col],
+            ))
 
-        # 按企业聚合：探测企业ID列和隐患/文书列
-        ent_id_col = next((c for c in (available_columns or []) if "企业" in c and ("ID" in c or "id" in c or "代码" in c)), None)
-        if ent_id_col:
-            hazard_candidates = [c for c in (available_columns or []) if "隐患" in c or "风险" in c or "事故" in c]
-            doc_candidates = [c for c in (available_columns or []) if "文书" in c or "立案" in c or "检查" in c or "处罚" in c]
-            agg_cols = [ent_id_col] + hazard_candidates + doc_candidates
-            if len(agg_cols) > 1:
-                transformers.append(("enterprise_agg", EnterpriseAggregator(enterprise_id_col=ent_id_col, hazard_cols=hazard_candidates, document_cols=doc_candidates), agg_cols))
+        # 按企业聚合
+        ent_id_col = sf.get("enterprise_id_col", "enterprise_id")
+        hazard_candidates = [c for c in sf.get("hazard_cols", []) if c in avail]
+        doc_candidates = [c for c in sf.get("document_cols", []) if c in avail]
+        agg_cols = ([ent_id_col] if ent_id_col in avail else []) + hazard_candidates + doc_candidates
+        if ent_id_col in avail and (hazard_candidates or doc_candidates):
+            transformers.append((
+                "enterprise_agg",
+                EnterpriseAggregator(
+                    enterprise_id_col=ent_id_col,
+                    hazard_cols=hazard_candidates,
+                    document_cols=doc_candidates,
+                ),
+                agg_cols,
+            ))
 
-        # 数据可信度系数
-        source_col = next((c for c in (available_columns or []) if "来源" in c or "source" in c.lower()), None)
-        if source_col:
-            transformers.append(("credibility", DataCredibilityTransformer(source_col=source_col), [source_col]))
+        # 数据可信度系数（预合并数据无单独来源列，跳过；原始表可配置 source_col）
+        source_col = sf.get("source_col") or next(
+            (c for c in avail if "数据来源" == c or c == "cf_source"), None
+        )
+        if source_col and source_col in avail:
+            transformers.append((
+                "credibility",
+                DataCredibilityTransformer(source_col=source_col),
+                [source_col],
+            ))
 
         column_transformer = ColumnTransformer(
             transformers=transformers,
@@ -860,37 +909,45 @@ class FeatureEngineeringPipeline:
         if _filter(self.config.industry_columns):
             names.append("industry_risk_coefficient")
 
-        # 特殊逻辑特征名
-        dust_cols = [c for c in (available_columns or []) if "除尘" in c]
-        if dust_cols:
+        # 特殊逻辑特征名（与 _build_pipeline 保持镜像）
+        avail = set(available_columns or [])
+        sf = getattr(self.config, "special_features", {}) or {}
+
+        dust_cfg = sf.get("dust_removal", {})
+        dry_col = dust_cfg.get("dry_col", "dust_ganshi_num")
+        wet_col = dust_cfg.get("wet_col", "dust_shishi_num")
+        if any(c in avail for c in [dry_col, wet_col]):
             names.extend(["dry_removal_ratio", "wet_removal_ratio"])
 
-        confined_cols = [c for c in (available_columns or []) if any(k in c for k in ["有限空间", "密闭空间", "受限空间", "空间作业"])]
-        if confined_cols:
+        if any(c in avail for c in sf.get("confined_space_cols", [])):
             names.append("confined_space_flag")
 
-        chem_cols = [c for c in (available_columns or []) if any(k in c for k in ["危化品", "危险化学品", "化学品"])]
-        if chem_cols:
+        if any(c in avail for c in sf.get("hazardous_chemical_cols", [])):
             names.append("hazardous_chemical_flag")
 
-        time_col = next((c for c in (available_columns or []) if "时间" in c or "年份" in c or "year" in c.lower()), None)
-        if time_col:
-            value_candidates = [c for c in (available_columns or []) if c not in self.config.binary_columns + self.config.enum_columns + self.config.text_columns + self.config.industry_columns and c != time_col]
-            decay_value_cols = [c for c in value_candidates if any(k in c for k in ["隐患", "事故", "风险", "处罚", "检查", "投入"])]
+        time_col = sf.get("time_col", "report_time")
+        decay_value_cols = [c for c in sf.get("time_decay_value_cols", []) if c in avail]
+        if time_col in avail and decay_value_cols:
             for col in decay_value_cols:
                 names.append(f"{col}_decay_weighted")
 
-        lon_col = next((c for c in (available_columns or []) if "经度" in c or "lon" in c.lower()), None)
-        lat_col = next((c for c in (available_columns or []) if "纬度" in c or "lat" in c.lower()), None)
-        if lon_col and lat_col:
+        geo_cfg = sf.get("geo_fence", {})
+        lon_col = geo_cfg.get("lon_col", "dir_longitude")
+        lat_col = geo_cfg.get("lat_col", "dir_latitude")
+        if lon_col in avail and lat_col in avail:
             names.append("in_chemical_park")
 
-        ent_id_col = next((c for c in (available_columns or []) if "企业" in c and ("ID" in c or "id" in c or "代码" in c)), None)
-        if ent_id_col:
+        ent_id_col = sf.get("enterprise_id_col", "enterprise_id")
+        if ent_id_col in avail and (
+            any(c in avail for c in sf.get("hazard_cols", []))
+            or any(c in avail for c in sf.get("document_cols", []))
+        ):
             names.extend(["enterprise_hazard_score", "enterprise_doc_score"])
 
-        source_col = next((c for c in (available_columns or []) if "来源" in c or "source" in c.lower()), None)
-        if source_col:
+        source_col = sf.get("source_col") or next(
+            (c for c in avail if c in ("数据来源", "cf_source")), None
+        )
+        if source_col and source_col in avail:
             names.append("data_credibility")
 
         return names

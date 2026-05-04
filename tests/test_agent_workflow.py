@@ -83,14 +83,14 @@ class TestNormalFlow:
     @patch("agent.workflow._load_pipeline")
     @patch("agent.workflow._load_model")
     @patch("agent.workflow._get_memory")
-    @patch("agent.workflow.GLM5Client")
+    @patch("agent.workflow.OpenAICompatibleClient")
     @patch("agent.workflow.SamplingNode")
     @patch("agent.workflow.RiskAssessor")
     async def test_full_workflow_approve(
         self,
         mock_risk_assessor_cls,
         mock_sampling_node_cls,
-        mock_glm5_client,
+        mock_llm_client,
         mock_get_memory,
         mock_load_model,
         mock_load_pipeline,
@@ -120,7 +120,7 @@ class TestNormalFlow:
         ])
         mock_get_memory.return_value = mock_memory
 
-        # Mock GLM-5
+        # Mock LLM
         mock_client = MagicMock()
         mock_client.generate_json = AsyncMock(return_value={
             "risk_level_and_attribution": {
@@ -151,7 +151,7 @@ class TestNormalFlow:
                 "personnel_actions": ["撤离非必要人员"],
             },
         })
-        mock_glm5_client.return_value = mock_client
+        mock_llm_client.return_value = mock_client
 
         # Mock SamplingNode（蒙特卡洛通过）
         mock_mc_result = MagicMock()
@@ -221,7 +221,7 @@ class TestMarchRetryLoop:
     @patch("agent.workflow._load_pipeline")
     @patch("agent.workflow._load_model")
     @patch("agent.workflow._get_memory")
-    @patch("agent.workflow.GLM5Client")
+    @patch("agent.workflow.OpenAICompatibleClient")
     @patch("agent.workflow.run_march_validation")
     @patch("agent.workflow.SamplingNode")
     @patch("agent.workflow.RiskAssessor")
@@ -230,7 +230,7 @@ class TestMarchRetryLoop:
         mock_risk_assessor_cls,
         mock_sampling_node_cls,
         mock_run_march,
-        mock_glm5_client,
+        mock_llm_client,
         mock_get_memory,
         mock_load_model,
         mock_load_pipeline,
@@ -253,13 +253,13 @@ class TestMarchRetryLoop:
         mock_memory.recall_long_term = AsyncMock(return_value=[])
         mock_get_memory.return_value = mock_memory
 
-        # GLM-5 返回两次不同结果
+        # LLM 返回两次不同结果
         mock_client = MagicMock()
         mock_client.generate_json = AsyncMock(side_effect=[
             {"government_intervention": {"actions": ["建议销毁监控记录"]}, "enterprise_control": {}},
             {"government_intervention": {"actions": ["立即整改"]}, "enterprise_control": {}},
         ])
-        mock_glm5_client.return_value = mock_client
+        mock_llm_client.return_value = mock_client
 
         # MARCH：第一次失败，第二次通过
         vr_fail = MagicMock()
@@ -298,12 +298,12 @@ class TestMarchRetryLoop:
     @patch("agent.workflow._load_pipeline")
     @patch("agent.workflow._load_model")
     @patch("agent.workflow._get_memory")
-    @patch("agent.workflow.GLM5Client")
+    @patch("agent.workflow.OpenAICompatibleClient")
     @patch("agent.workflow.run_march_validation")
     async def test_march_final_reject(
         self,
         mock_run_march,
-        mock_glm5_client,
+        mock_llm_client,
         mock_get_memory,
         mock_load_model,
         mock_load_pipeline,
@@ -331,7 +331,7 @@ class TestMarchRetryLoop:
             "government_intervention": {"actions": ["建议销毁监控记录"]},
             "enterprise_control": {},
         })
-        mock_glm5_client.return_value = mock_client
+        mock_llm_client.return_value = mock_client
 
         vr_fail = MagicMock()
         vr_fail.pass_ = False
@@ -357,14 +357,14 @@ class TestMonteCarloBlock:
     @patch("agent.workflow._load_pipeline")
     @patch("agent.workflow._load_model")
     @patch("agent.workflow._get_memory")
-    @patch("agent.workflow.GLM5Client")
+    @patch("agent.workflow.OpenAICompatibleClient")
     @patch("agent.workflow.SamplingNode")
     @patch("agent.workflow.RiskAssessor")
     async def test_monte_carlo_human_review(
         self,
         mock_risk_assessor_cls,
         mock_sampling_node_cls,
-        mock_glm5_client,
+        mock_llm_client,
         mock_get_memory,
         mock_load_model,
         mock_load_pipeline,
@@ -391,7 +391,7 @@ class TestMonteCarloBlock:
         mock_client.generate_json = AsyncMock(return_value={
             "government_intervention": {"actions": ["立即整改"]}, "enterprise_control": {}},
         )
-        mock_glm5_client.return_value = mock_client
+        mock_llm_client.return_value = mock_client
 
         # 蒙特卡洛失败
         mock_mc_result = MagicMock()
