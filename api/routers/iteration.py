@@ -6,9 +6,10 @@ import os
 import time
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
+from api.security import require_admin_token
 from iteration.approval_fsm import ApprovalFSM, ApprovalStatus
 from iteration.canary import CanaryDeployment
 from iteration.monitor import ModelMonitor
@@ -105,7 +106,10 @@ _staging_monitor_instance: Optional[StagingMonitor] = None
 
 
 @router.post("/trigger", response_model=TriggerResponse)
-async def trigger_iteration(request: TriggerRequest) -> TriggerResponse:
+async def trigger_iteration(
+    request: TriggerRequest,
+    _: None = Depends(require_admin_token),
+) -> TriggerResponse:
     """
     手动触发迭代流水线
     """
@@ -168,7 +172,10 @@ async def get_status() -> StatusResponse:
 
 
 @router.post("/approve", response_model=ApproveResponse)
-async def approve(request: ApproveRequest) -> ApproveResponse:
+async def approve(
+    request: ApproveRequest,
+    _: None = Depends(require_admin_token),
+) -> ApproveResponse:
     """
     审批人提交审批结果（security/tech 两级）
     """
@@ -204,7 +211,10 @@ async def approve(request: ApproveRequest) -> ApproveResponse:
 
 
 @router.post("/canary", response_model=CanaryResponse)
-async def canary(request: CanaryRequest) -> CanaryResponse:
+async def canary(
+    request: CanaryRequest,
+    _: None = Depends(require_admin_token),
+) -> CanaryResponse:
     """
     调整灰度流量比例
     """
@@ -241,6 +251,7 @@ async def run_regression(
     new_model_path: str,
     test_data_path: str,
     output_path: str = "regression_report.json",
+    _: None = Depends(require_admin_token),
 ) -> Dict:
     """
     手动触发回归测试

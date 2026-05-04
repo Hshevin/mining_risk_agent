@@ -201,7 +201,7 @@ python -c "from iteration.monitor import ModelMonitor; ModelMonitor().should_ret
 
 ```bash
 cd mining_risk_agent
-cp .env.example .env       # 可选：设置 LLM_PROVIDER，并填入 LLM_API_KEY 或对应 provider 的 API Key
+cp .env.example .env       # 可选：设置 LLM_PROVIDER、LLM API Key、MRA_ADMIN_TOKEN 等
 docker compose up -d --build
 ```
 
@@ -214,7 +214,7 @@ docker compose up -d --build
 **Docker 服务说明：**
 | 服务 | 镜像 | 容器名 | 端口映射 | 说明 |
 |------|------|--------|----------|------|
-| api | `mining-risk-agent-api` | `mining_risk_api` | `8000:8000` | FastAPI + Uvicorn（Python 3.10-slim） |
+| api | `mining-risk-agent-api` | `mining_risk_api` | `127.0.0.1:8000:8000` | FastAPI + Uvicorn（Python 3.10-slim，仅本机直连） |
 | frontend | `mining-risk-agent-frontend` | `mining_risk_frontend` | `8501:80` | React/Vite SPA（多阶段：node:20-alpine 构建 → nginx:alpine 托管 + 反向代理 `/api`、`/health`、`/docs` 至 `api`） |
 
 > **架构提示**：前端容器内 Nginx 监听 80 端口，把 `/api/*`、`/health`、`/docs`、`/redoc`、`/openapi.json` 反向代理至 `http://api:8000`，并关闭 `proxy_buffering` 以保留 SSE 流式节点输出；浏览器只与前端同源通信，从而避免 CORS 与跨域 Cookie 问题。详见 `mining_risk_agent/frontend/nginx.conf`。
@@ -240,6 +240,8 @@ docker compose up -d --build
 | `/api/v1/iteration/status` | GET | 查询当前迭代状态（监控/训练中/审批中/试运行中） |
 | `/api/v1/iteration/approve` | POST | 审批人提交审批结果（security/tech 两级） |
 | `/api/v1/iteration/canary` | POST | 调整灰度流量比例（0.0/0.1/0.5/1.0） |
+
+> 管理接口说明：LLM 配置、知识库写入/快照/回滚、审计查询、模型迭代触发/审批/灰度/回归等敏感接口需要 `X-Admin-Token`，值来自 `MRA_ADMIN_TOKEN`。本地路演如需无鉴权管理操作，可临时设置 `MRA_ALLOW_UNAUTHENTICATED_ADMIN=true`；生产环境建议设置 `MRA_ENABLE_MOCK_FALLBACK=false`，使决策工作流故障返回 503 而不是 Mock 演示数据。
 
 ### 记忆系统接口示例
 

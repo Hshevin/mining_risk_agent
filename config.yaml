@@ -235,32 +235,6 @@ model:
           min_samples_split: 5
           min_samples_leaf: 2
           max_features: "sqrt"
-      
-      - name: "mlp"
-        type: "mlp"
-        params:
-          hidden_layers: [128, 64]
-          dropout_rate: 0.3
-          activation: "relu"
-          epochs: 20
-          batch_size: 32
-          learning_rate: 0.001
-          early_stopping_patience: 5
-      
-      - name: "cnn1d"
-        type: "cnn1d"
-        params:
-          conv_layers:
-            - filters: 64
-              kernel_size: 3
-            - filters: 128
-              kernel_size: 3
-          dense_units: 64
-          dropout_rate: 0.3
-          epochs: 20
-          batch_size: 32
-          learning_rate: 0.001
-          early_stopping_patience: 5
     
     # 元学习器配置
     meta_learner:
@@ -285,8 +259,8 @@ model:
       val: 0.2
       test: 0.1
     
-    # 模型保存路径
-    model_path: "models/stacking_risk_v1_stable.pkl"
+    # 模型保存路径（当前使用 stable 训练产物，文件名与 README 默认一致便于 API/前端加载）
+    model_path: "models/stacking_risk_v1.pkl"
     pipeline_path: "models/preprocessing_pipeline.pkl"
   
   # 风险等级映射

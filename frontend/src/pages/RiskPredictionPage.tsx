@@ -74,21 +74,24 @@ export default function RiskPredictionPage({ scenario }: Props) {
         if (v !== null && v !== undefined) payload[k] = v;
       });
     }
+    payload.scenario_id = scenario;
 
     setLoading(true);
     setStreamLog([]);
     setDecision(null);
 
+    let result: DecisionResponse | null = null;
     if (useStream) {
       abortRef.current?.abort();
       const ctrl = new AbortController();
       abortRef.current = ctrl;
       try {
-        await streamDecision(
+        result = await streamDecision(
           enterpriseId,
           payload,
           (msg) => setStreamLog((prev) => [...prev, msg]),
           ctrl.signal,
+          scenario,
         );
       } catch (e) {
         // SSE 失败回退到普通请求
@@ -96,7 +99,9 @@ export default function RiskPredictionPage({ scenario }: Props) {
       }
     }
 
-    const result = await postDecision(enterpriseId, payload);
+    if (!result) {
+      result = await postDecision(enterpriseId, payload, scenario);
+    }
     if (result) {
       setDecision(result);
     } else {

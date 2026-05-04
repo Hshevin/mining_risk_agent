@@ -4,9 +4,10 @@
 
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
+from api.security import require_admin_token
 from harness.knowledge_base import KnowledgeBaseManager
 from utils.logger import get_logger
 
@@ -49,7 +50,10 @@ async def read_knowledge(filename: str) -> Dict[str, str]:
 
 
 @router.post("/write")
-async def write_knowledge(request: KnowledgeUpdateRequest) -> Dict[str, str]:
+async def write_knowledge(
+    request: KnowledgeUpdateRequest,
+    _: None = Depends(require_admin_token),
+) -> Dict[str, str]:
     """写入知识库文件"""
     kb = _get_kb()
     kb.write(request.filename, request.content, agent_id=request.agent_id)
@@ -57,7 +61,10 @@ async def write_knowledge(request: KnowledgeUpdateRequest) -> Dict[str, str]:
 
 
 @router.post("/append")
-async def append_knowledge(request: KnowledgeAppendRequest) -> Dict[str, str]:
+async def append_knowledge(
+    request: KnowledgeAppendRequest,
+    _: None = Depends(require_admin_token),
+) -> Dict[str, str]:
     """追加内容到知识库文件"""
     kb = _get_kb()
     kb.append(request.filename, request.content, agent_id=request.agent_id)
@@ -65,7 +72,11 @@ async def append_knowledge(request: KnowledgeAppendRequest) -> Dict[str, str]:
 
 
 @router.post("/snapshot")
-async def snapshot_knowledge(commit_message: str, agent_id: Optional[str] = None) -> Dict[str, str]:
+async def snapshot_knowledge(
+    commit_message: str,
+    agent_id: Optional[str] = None,
+    _: None = Depends(require_admin_token),
+) -> Dict[str, str]:
     """生成知识库快照"""
     kb = _get_kb()
     commit_id = kb.snapshot(commit_message, agent_id=agent_id)
@@ -73,7 +84,10 @@ async def snapshot_knowledge(commit_message: str, agent_id: Optional[str] = None
 
 
 @router.post("/rollback/{commit_id}")
-async def rollback_knowledge(commit_id: str) -> Dict[str, str]:
+async def rollback_knowledge(
+    commit_id: str,
+    _: None = Depends(require_admin_token),
+) -> Dict[str, str]:
     """回滚知识库到指定版本"""
     kb = _get_kb()
     kb.rollback(commit_id)

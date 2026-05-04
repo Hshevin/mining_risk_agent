@@ -101,7 +101,9 @@ export interface NodeStatus {
   detail?: string;
   final_status?: string;
   predicted_level?: string;
+  error?: string;
   mock?: boolean;
+  decision_response?: DecisionResponse;
 }
 
 export interface DecisionResponse {

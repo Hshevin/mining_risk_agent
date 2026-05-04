@@ -22,10 +22,17 @@ import type {
 const RAW_BASE = (import.meta.env.VITE_API_BASE as string | undefined) ?? "";
 // 去掉末尾斜杠以保证拼接稳定
 const API_BASE = RAW_BASE.replace(/\/$/, "");
+const ADMIN_TOKEN = (import.meta.env.VITE_ADMIN_API_TOKEN as string | undefined) ?? "";
 
 function url(path: string): string {
   if (path.startsWith("http")) return path;
   return `${API_BASE}${path}`;
+}
+
+function adminHeaders(extra?: HeadersInit): HeadersInit {
+  return ADMIN_TOKEN
+    ? { ...extra, "X-Admin-Token": ADMIN_TOKEN }
+    : { ...extra };
 }
 
 async function jsonOrThrow<T>(resp: Response): Promise<T> {
@@ -52,6 +59,7 @@ export async function switchScenario(
   try {
     const resp = await fetch(url(`/api/v1/agent/scenario/${scenarioId}`), {
       method: "POST",
+      headers: adminHeaders(),
     });
     if (!resp.ok) return null;
     return (await resp.json()) as ScenarioSwitchResponse;
@@ -62,7 +70,10 @@ export async function switchScenario(
 
 export async function fetchLLMConfig(): Promise<LLMConfigResponse | null> {
   try {
-    const resp = await fetch(url("/api/v1/agent/llm"), { method: "GET" });
+    const resp = await fetch(url("/api/v1/agent/llm"), {
+      method: "GET",
+      headers: adminHeaders(),
+    });
     if (!resp.ok) return null;
     return (await resp.json()) as LLMConfigResponse;
   } catch {
@@ -76,6 +87,7 @@ export async function switchLLMProvider(
   try {
     const resp = await fetch(url(`/api/v1/agent/llm/${provider}`), {
       method: "POST",
+      headers: adminHeaders(),
     });
     if (!resp.ok) return null;
     return (await resp.json()) as LLMConfigResponse;
@@ -90,7 +102,7 @@ export async function updateLLMConfig(
   try {
     const resp = await fetch(url("/api/v1/agent/llm"), {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: adminHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify(payload),
     });
     if (!resp.ok) return null;
@@ -103,12 +115,13 @@ export async function updateLLMConfig(
 export async function postDecision(
   enterpriseId: string,
   data: Record<string, unknown>,
+  scenarioId?: string,
 ): Promise<DecisionResponse | null> {
   try {
     const resp = await fetch(url("/api/v1/agent/decision"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ enterprise_id: enterpriseId, data }),
+      body: JSON.stringify({ enterprise_id: enterpriseId, data, scenario_id: scenarioId }),
     });
     if (!resp.ok) return null;
     return (await resp.json()) as DecisionResponse;
@@ -126,11 +139,12 @@ export async function streamDecision(
   data: Record<string, unknown>,
   onMessage: (msg: NodeStatus) => void,
   signal?: AbortSignal,
-): Promise<void> {
+  scenarioId?: string,
+): Promise<DecisionResponse | null> {
   const resp = await fetch(url("/api/v1/agent/decision/stream"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ enterprise_id: enterpriseId, data }),
+    body: JSON.stringify({ enterprise_id: enterpriseId, data, scenario_id: scenarioId }),
     signal,
   });
   if (!resp.ok || !resp.body) {
@@ -139,6 +153,7 @@ export async function streamDecision(
   const reader = resp.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
+  let finalDecision: DecisionResponse | null = null;
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
@@ -152,12 +167,14 @@ export async function streamDecision(
       if (!payload) continue;
       try {
         const obj = JSON.parse(payload) as NodeStatus;
+        if (obj.decision_response) finalDecision = obj.decision_response;
         onMessage(obj);
       } catch {
         // 忽略非 JSON 行
       }
     }
   }
+  return finalDecision;
 }
 
 export async function uploadDataFile(
@@ -218,7 +235,7 @@ export async function triggerIteration(): Promise<IterationTriggerResponse | nul
   try {
     const resp = await fetch(url("/api/v1/iteration/trigger"), {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: adminHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({}),
     });
     if (!resp.ok) return null;
@@ -242,7 +259,9 @@ export async function queryAudit(
     Object.entries(params).forEach(([k, v]) => {
       if (v !== undefined && v !== null && v !== "") usp.set(k, String(v));
     });
-    const resp = await fetch(url(`/api/v1/audit/query?${usp.toString()}`));
+    const resp = await fetch(url(`/api/v1/audit/query?${usp.toString()}`), {
+      headers: adminHeaders(),
+    });
     if (!resp.ok) return [];
     return jsonOrThrow<AuditLogEntry[]>(resp);
   } catch {
