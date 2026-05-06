@@ -232,6 +232,21 @@ class LLMProviderConfig(BaseModel):
     default_max_tokens: int = 8192
     max_retries: int = 3
 
+    @model_validator(mode="after")
+    def _apply_env_override(self) -> "GLM5Config":
+        env_key = os.getenv("GLM5_API_KEY")
+        if env_key:
+            self.api_key = env_key
+        if not self.api_key:
+            raise ValueError(
+                "GLM-5 API Key 未配置，请设置环境变量 GLM5_API_KEY"
+            )
+        return self
+
+
+class LLMConfig(BaseModel):
+    glm5: GLM5Config = Field(default_factory=GLM5Config)
+
 
 class LLMConfig(BaseModel):
     provider: str = "glm5"

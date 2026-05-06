@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import {
   apiBase,
   fetchHealth,
@@ -13,6 +14,11 @@ import type {
   LLMUpdateRequest,
   ScenarioId,
 } from "../api/types";
+=======
+import { apiBase, fetchHealth } from "../api/client";
+import { SCENARIO_CONFIG } from "../data/demoData";
+import type { HealthResponse, ScenarioId } from "../api/types";
+>>>>>>> e7cc200 (some changes)
 import { useEffect, useState } from "react";
 import JsonView from "../components/JsonView";
 
@@ -21,6 +27,7 @@ interface Props {
   health: HealthResponse | null;
 }
 
+<<<<<<< HEAD
 type LLMFormState = Required<
   Pick<
     LLMUpdateRequest,
@@ -46,13 +53,18 @@ const EMPTY_LLM_FORM: LLMFormState = {
   max_retries: 3,
 };
 
+=======
+>>>>>>> e7cc200 (some changes)
 const API_TABLE = [
   { path: "POST /api/v1/agent/decision", desc: "触发完整决策工作流" },
   { path: "POST /api/v1/agent/decision/stream", desc: "SSE 流式节点状态" },
   { path: "POST /api/v1/agent/scenario/{id}", desc: "切换场景配置" },
+<<<<<<< HEAD
   { path: "GET /api/v1/agent/llm", desc: "查询当前 LLM 模型配置" },
   { path: "POST /api/v1/agent/llm/{provider}", desc: "切换已配置的 LLM provider" },
   { path: "POST /api/v1/agent/llm", desc: "创建或更新自定义 OpenAI 兼容模型配置" },
+=======
+>>>>>>> e7cc200 (some changes)
   { path: "POST /api/v1/data/upload", desc: "数据文件上传（CSV/Excel）" },
   { path: "GET /api/v1/knowledge/list", desc: "知识库文件列表" },
   { path: "GET /api/v1/knowledge/read/{filename}", desc: "知识库文件读取" },
@@ -63,6 +75,7 @@ const API_TABLE = [
 
 export default function SystemConfigPage({ scenario, health }: Props) {
   const [latestHealth, setLatestHealth] = useState<HealthResponse | null>(health);
+<<<<<<< HEAD
   const [llmConfig, setLlmConfig] = useState<LLMConfigResponse | null>(null);
   const [switchingProvider, setSwitchingProvider] = useState(false);
   const [llmMessage, setLlmMessage] = useState<string>("");
@@ -132,6 +145,15 @@ export default function SystemConfigPage({ scenario, health }: Props) {
     }
     setSwitchingProvider(false);
   }
+=======
+
+  useEffect(() => {
+    fetchHealth().then(setLatestHealth);
+  }, []);
+
+  const cfg = SCENARIO_CONFIG[scenario];
+  const online = latestHealth?.status === "healthy";
+>>>>>>> e7cc200 (some changes)
 
   return (
     <div>
@@ -144,6 +166,7 @@ export default function SystemConfigPage({ scenario, health }: Props) {
           : "❌ 后端未连通（前端将以本地 Mock 数据进行演示）"}
       </div>
 
+<<<<<<< HEAD
       <div className="subtitle">🧠 大模型切换</div>
       <div className="scada-card" style={{ marginBottom: 16 }}>
         <div
@@ -336,6 +359,8 @@ export default function SystemConfigPage({ scenario, health }: Props) {
         </button>
       </div>
 
+=======
+>>>>>>> e7cc200 (some changes)
       <div className="subtitle">🎛️ 当前场景配置参数</div>
       <JsonView data={cfg} maxHeight={220} />
 

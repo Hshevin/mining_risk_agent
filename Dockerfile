@@ -21,10 +21,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # 优先复制依赖清单以利用层缓存
 ARG REQUIREMENTS_FILE=requirements.txt
 COPY requirements*.txt ./
+<<<<<<< HEAD
 RUN pip install --no-cache-dir uv
 
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv pip install --system -r "${REQUIREMENTS_FILE}"
+=======
+RUN pip install --no-cache-dir -r "${REQUIREMENTS_FILE}"
+
+>>>>>>> e7cc200 (some changes)
 # 复制代码（注意：构建上下文为 mining_risk_agent/ 本身）
 COPY . .
 

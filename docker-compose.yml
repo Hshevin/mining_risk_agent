@@ -10,9 +10,15 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
+<<<<<<< HEAD
         # 默认使用部署推理依赖：API 基础包 + 当前 pkl 推理必需 ML 包。
         # 如需训练/RAG/旧 Streamlit，可改为 requirements-full.txt。
         REQUIREMENTS_FILE: ${API_REQUIREMENTS_FILE:-requirements-deploy.txt}
+=======
+        # 默认使用精简 API 依赖，显著减小后端镜像体积。
+        # 如需训练/RAG/旧 Streamlit，可改为 requirements-full.txt。
+        REQUIREMENTS_FILE: ${API_REQUIREMENTS_FILE:-requirements.txt}
+>>>>>>> e7cc200 (some changes)
     image: mining-risk-agent-api:latest
     container_name: mining_risk_api
     ports:
@@ -27,6 +33,7 @@ services:
     environment:
       PYTHONPATH: /app
       PYTHONUNBUFFERED: "1"
+<<<<<<< HEAD
       # LLM / OpenAI 兼容 SDK 凭证（如需）。
       # 任意自定义 provider 可通过通用 LLM_* 覆盖，或在 config.yaml 中配置 api_key_env 后透传对应变量。
       LLM_PROVIDER: ${LLM_PROVIDER:-glm5}
@@ -47,6 +54,11 @@ services:
       OPENBLAS_NUM_THREADS: "1"
       MKL_NUM_THREADS: "1"
       NUMEXPR_NUM_THREADS: "1"
+=======
+      # GLM-5 / OpenAI 兼容 SDK 凭证（如需）
+      GLM5_API_KEY: ${GLM5_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+>>>>>>> e7cc200 (some changes)
     command: uvicorn api.main:app --host 0.0.0.0 --port 8000
     restart: unless-stopped
     healthcheck:
@@ -70,7 +82,11 @@ services:
       - "8501:80"
     depends_on:
       api:
+<<<<<<< HEAD
         condition: service_healthy
+=======
+        condition: service_started
+>>>>>>> e7cc200 (some changes)
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost/ >/dev/null 2>&1 || exit 1"]

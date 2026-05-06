@@ -12,10 +12,15 @@ from typing import Any, Dict, List, Optional
 
 try:
     from sentence_transformers import CrossEncoder
+<<<<<<< HEAD
     _CROSS_ENCODER_IMPORT_ERROR = None
 except Exception as e:
     CrossEncoder = None
     _CROSS_ENCODER_IMPORT_ERROR = e
+=======
+except ImportError:
+    CrossEncoder = None
+>>>>>>> e7cc200 (some changes)
 
 from utils.config import get_config
 from utils.logger import get_logger
@@ -43,11 +48,17 @@ class Reranker:
 
     def _load_model(self) -> Any:
         if CrossEncoder is None:
+<<<<<<< HEAD
             detail = f" 原始错误: {_CROSS_ENCODER_IMPORT_ERROR}" if _CROSS_ENCODER_IMPORT_ERROR else ""
             raise ImportError(
                 "Reranker 需要可选依赖 sentence-transformers。"
                 "请安装 `pip install -r requirements-rag.txt` 或 `pip install -r requirements-full.txt`。"
                 f"{detail}"
+=======
+            raise ImportError(
+                "Reranker 需要可选依赖 sentence-transformers。"
+                "请安装 `pip install -r requirements-rag.txt` 或 `pip install -r requirements-full.txt`。"
+>>>>>>> e7cc200 (some changes)
             )
         if self._model is None:
             logger.info(f"加载重排序模型: {self.model_name}")

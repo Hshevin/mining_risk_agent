@@ -408,6 +408,7 @@ logging:
 
 # LLM 配置
 llm:
+<<<<<<< HEAD
   provider: "glm5"  # 当前启用的 provider；也可用环境变量 LLM_PROVIDER 覆盖
   providers:
     # 任意 OpenAI Chat Completions 兼容模型都可新增一个 provider。
@@ -426,6 +427,14 @@ llm:
       default_temperature: 0.3
       default_max_tokens: 8192
       max_retries: 3
+=======
+  glm5:
+    model: "glm-5"
+    base_url: "https://open.bigmodel.cn/api/paas/v4/"
+    default_temperature: 0.3
+    default_max_tokens: 8192
+    max_retries: 3
+>>>>>>> e7cc200 (some changes)
 
 # 场景化配置
 scenarios:

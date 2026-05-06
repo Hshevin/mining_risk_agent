@@ -1,6 +1,11 @@
+<<<<<<< HEAD
 # 后端 API 核心精简依赖
 # 仅包含 FastAPI 服务与基础 sklearn/pandas 运行时。
 # Docker 部署真实模型推理默认使用 requirements-deploy.txt；
+=======
+# 后端 API 默认精简依赖
+# 用于 FastAPI 服务镜像，避免安装前端、训练、RAG、深度学习等重依赖。
+>>>>>>> e7cc200 (some changes)
 # 如需完整训练 / RAG / 旧 Streamlit 前端，请安装 requirements-full.txt。
 
 # Web 框架

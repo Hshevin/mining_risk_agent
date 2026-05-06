@@ -74,24 +74,37 @@ export default function RiskPredictionPage({ scenario }: Props) {
         if (v !== null && v !== undefined) payload[k] = v;
       });
     }
+<<<<<<< HEAD
     payload.scenario_id = scenario;
+=======
+>>>>>>> e7cc200 (some changes)
 
     setLoading(true);
     setStreamLog([]);
     setDecision(null);
 
+<<<<<<< HEAD
     let result: DecisionResponse | null = null;
+=======
+>>>>>>> e7cc200 (some changes)
     if (useStream) {
       abortRef.current?.abort();
       const ctrl = new AbortController();
       abortRef.current = ctrl;
       try {
+<<<<<<< HEAD
         result = await streamDecision(
+=======
+        await streamDecision(
+>>>>>>> e7cc200 (some changes)
           enterpriseId,
           payload,
           (msg) => setStreamLog((prev) => [...prev, msg]),
           ctrl.signal,
+<<<<<<< HEAD
           scenario,
+=======
+>>>>>>> e7cc200 (some changes)
         );
       } catch (e) {
         // SSE 失败回退到普通请求
@@ -99,9 +112,13 @@ export default function RiskPredictionPage({ scenario }: Props) {
       }
     }
 
+<<<<<<< HEAD
     if (!result) {
       result = await postDecision(enterpriseId, payload, scenario);
     }
+=======
+    const result = await postDecision(enterpriseId, payload);
+>>>>>>> e7cc200 (some changes)
     if (result) {
       setDecision(result);
     } else {

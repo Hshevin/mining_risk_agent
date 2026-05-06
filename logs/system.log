@@ -5803,3 +5803,114 @@ If this is a private repository, make sure to pass a token having permission to 
 2026-05-03 12:58:24,100 - __main__ - INFO -   类似事故处理案例.md: 3670 bytes
 2026-05-03 12:58:24,101 - __main__ - INFO -   预警历史经验与短期记忆摘要.md: 1258 bytes
 2026-05-03 13:02:02,592 - api.main - INFO - 应用关闭
+2026-05-04 12:09:56,874 - data.loader - INFO - 加载预合并训练集: /Users/kita/language/python/京东杯/公开数据/new_已清洗.csv
+2026-05-04 12:09:58,573 - data.loader - INFO - 成功加载 /Users/kita/language/python/京东杯/公开数据/new_已清洗.csv，形状: (80016, 215)
+2026-05-04 12:09:58,627 - data.preprocessor - INFO - 特征工程完成，输出形状: (500, 71)
+2026-05-04 12:10:13,594 - data.loader - INFO - 加载预合并训练集: /Users/kita/language/python/京东杯/公开数据/new_已清洗.csv
+2026-05-04 12:10:15,203 - data.loader - INFO - 成功加载 /Users/kita/language/python/京东杯/公开数据/new_已清洗.csv，形状: (80016, 215)
+2026-05-04 12:10:15,251 - data.preprocessor - INFO - 特征工程完成，输出形状: (500, 71)
+2026-05-04 12:10:30,942 - data.loader - INFO - 成功加载 ../公开数据/数据补充/szs_ent_label_202603191747.csv，形状: (6, 20)
+2026-05-04 12:10:30,944 - data.loader - INFO - 成功加载 ../公开数据/数据补充/st_enterprise_rating_information_filling_202603191739.csv，形状: (500, 38)
+2026-05-04 12:10:30,947 - data.loader - INFO - 成功加载 ../公开数据/数据补充/szs_business_address_202603191749.csv，形状: (500, 20)
+2026-05-04 12:10:30,949 - data.loader - INFO - 成功加载 ../公开数据/数据补充/st_fxsb_enterprise_routine_check_trouble_202603191745.csv，形状: (500, 29)
+2026-05-04 12:10:30,950 - data.loader - INFO - 成功加载 ../公开数据/数据补充/enterprise_routine_check_plan_202603191744.csv，形状: (30, 19)
+2026-05-04 12:10:30,952 - data.loader - INFO - 成功加载 ../公开数据/数据补充/enterprise_routine_check_log_202603191745.csv，形状: (500, 35)
+2026-05-04 12:10:30,961 - data.loader - INFO - 成功加载 ../公开数据/数据补充/szs_enterprise_information_202603191751.csv，形状: (500, 64)
+2026-05-04 12:10:30,964 - data.loader - INFO - 成功加载 ../公开数据/数据补充/zjstreet2_gcj02_202603191013.csv，形状: (500, 31)
+2026-05-04 12:10:30,965 - data.loader - INFO - 成功加载 ../公开数据/数据补充/szs_risk_target_202603191737.csv，形状: (401, 15)
+2026-05-04 12:10:30,968 - data.loader - INFO - 成功加载 ../公开数据/数据补充/szs_enterprise_industry_category_202603191748.csv，形状: (500, 44)
+2026-05-04 12:10:30,969 - data.loader - INFO - 成功加载 ../公开数据/数据补充/szs_enterprise_volkswirtschaft_202603191749.csv，形状: (500, 16)
+2026-05-04 12:10:30,972 - data.loader - INFO - 成功加载 ../公开数据/数据补充/szs_enterprise_dust_clear_record_202603191738.csv，形状: (500, 18)
+2026-05-04 12:10:30,974 - data.loader - INFO - 成功加载 ../公开数据/数据补充/szs_ent_label_report_history_202603191747.csv，形状: (500, 10)
+2026-05-04 12:10:30,975 - data.loader - INFO - 成功加载 ../公开数据/数据补充/st_enterprise_production_status_record_202603191742.csv，形状: (500, 15)
+2026-05-04 12:10:30,978 - data.loader - INFO - 成功加载 ../公开数据/数据补充/st_enterprise_directory_202603191746.csv，形状: (500, 41)
+2026-05-04 12:10:30,983 - data.loader - INFO - 成功加载 ../公开数据/数据补充/szs_enterprise_risk_202603191750.csv，形状: (500, 29)
+2026-05-04 12:10:30,985 - data.loader - INFO - 成功加载 ../公开数据/数据补充/szs_enterprise_safety_202603191748.csv，形状: (500, 37)
+2026-05-04 12:10:30,989 - data.loader - INFO - 成功加载 ../公开数据/数据补充/szs_enterprise_risk_history_202603191750.csv，形状: (500, 46)
+2026-05-04 12:10:30,991 - data.loader - INFO - 成功加载 ../公开数据/数据补充/zjj_house_safety_identify_202603191014.csv，形状: (500, 28)
+2026-05-04 12:10:30,993 - data.loader - INFO - 成功加载 ../公开数据/数据补充/zjj_house_base_info_202603191015.csv，形状: (500, 58)
+2026-05-04 12:10:30,994 - data.loader - WARNING - 跳过文件 ../公开数据/数据补充/enterprise_routine_check_log.xlsx: 加载文件失败 ../公开数据/数据补充/enterprise_routine_check_log.xlsx: Excel file format cannot be determined, you must specify an engine manually.
+2026-05-04 12:10:30,994 - data.loader - INFO - 目录 ../公开数据/数据补充 共加载 20 个文件
+2026-05-04 12:10:30,994 - data.loader - WARNING - 表 szs_ent_label_202603191747 无法确定 join 键，跳过
+2026-05-04 12:10:30,994 - data.loader - WARNING - 表 szs_business_address_202603191749 无法确定 join 键，跳过
+2026-05-04 12:10:30,994 - data.loader - WARNING - 表 st_fxsb_enterprise_routine_check_trouble_202603191745 无法确定 join 键，跳过
+2026-05-04 12:10:30,994 - data.loader - WARNING - 表 enterprise_routine_check_plan_202603191744 无法确定 join 键，跳过
+2026-05-04 12:10:30,994 - data.loader - WARNING - 表 enterprise_routine_check_log_202603191745 无法确定 join 键，跳过
+2026-05-04 12:10:30,994 - data.loader - WARNING - 表 szs_enterprise_information_202603191751 无法确定 join 键，跳过
+2026-05-04 12:10:30,994 - data.loader - WARNING - 表 zjstreet2_gcj02_202603191013 无法确定 join 键，跳过
+2026-05-04 12:10:30,994 - data.loader - WARNING - 表 szs_risk_target_202603191737 无法确定 join 键，跳过
+2026-05-04 12:10:30,994 - data.loader - WARNING - 表 szs_enterprise_industry_category_202603191748 无法确定 join 键，跳过
+2026-05-04 12:10:30,994 - data.loader - WARNING - 表 szs_enterprise_volkswirtschaft_202603191749 无法确定 join 键，跳过
+2026-05-04 12:10:30,994 - data.loader - WARNING - 表 szs_enterprise_dust_clear_record_202603191738 无法确定 join 键，跳过
+2026-05-04 12:10:30,994 - data.loader - WARNING - 表 szs_ent_label_report_history_202603191747 无法确定 join 键，跳过
+2026-05-04 12:10:30,994 - data.loader - WARNING - 表 st_enterprise_production_status_record_202603191742 无法确定 join 键，跳过
+2026-05-04 12:10:30,995 - data.loader - WARNING - 表 st_enterprise_directory_202603191746 无法确定 join 键，跳过
+2026-05-04 12:10:30,995 - data.loader - WARNING - 表 szs_enterprise_risk_202603191750 无法确定 join 键，跳过
+2026-05-04 12:10:30,995 - data.loader - WARNING - 表 szs_enterprise_safety_202603191748 无法确定 join 键，跳过
+2026-05-04 12:10:30,995 - data.loader - WARNING - 表 szs_enterprise_risk_history_202603191750 无法确定 join 键，跳过
+2026-05-04 12:10:30,995 - data.loader - WARNING - 表 zjj_house_safety_identify_202603191014 无法确定 join 键，跳过
+2026-05-04 12:10:30,995 - data.loader - WARNING - 表 zjj_house_base_info_202603191015 无法确定 join 键，跳过
+2026-05-04 12:10:30,995 - data.loader - INFO - 多表合并完成，最终形状: (500, 38)
+2026-05-04 12:10:38,703 - data.loader - INFO - 成功加载 ../公开数据/数据补充/szs_ent_label_202603191747.csv，形状: (6, 20)
+2026-05-04 12:10:38,706 - data.loader - INFO - 成功加载 ../公开数据/数据补充/st_enterprise_rating_information_filling_202603191739.csv，形状: (500, 38)
+2026-05-04 12:10:38,708 - data.loader - INFO - 成功加载 ../公开数据/数据补充/szs_business_address_202603191749.csv，形状: (500, 20)
+2026-05-04 12:10:38,711 - data.loader - INFO - 成功加载 ../公开数据/数据补充/st_fxsb_enterprise_routine_check_trouble_202603191745.csv，形状: (500, 29)
+2026-05-04 12:10:38,712 - data.loader - INFO - 成功加载 ../公开数据/数据补充/enterprise_routine_check_plan_202603191744.csv，形状: (30, 19)
+2026-05-04 12:10:38,716 - data.loader - INFO - 成功加载 ../公开数据/数据补充/enterprise_routine_check_log_202603191745.csv，形状: (500, 35)
+2026-05-04 12:10:38,727 - data.loader - INFO - 成功加载 ../公开数据/数据补充/szs_enterprise_information_202603191751.csv，形状: (500, 64)
+2026-05-04 12:10:38,730 - data.loader - INFO - 成功加载 ../公开数据/数据补充/zjstreet2_gcj02_202603191013.csv，形状: (500, 31)
+2026-05-04 12:10:38,733 - data.loader - INFO - 成功加载 ../公开数据/数据补充/szs_risk_target_202603191737.csv，形状: (401, 15)
+2026-05-04 12:10:38,737 - data.loader - INFO - 成功加载 ../公开数据/数据补充/szs_enterprise_industry_category_202603191748.csv，形状: (500, 44)
+2026-05-04 12:10:38,738 - data.loader - INFO - 成功加载 ../公开数据/数据补充/szs_enterprise_volkswirtschaft_202603191749.csv，形状: (500, 16)
+2026-05-04 12:10:38,742 - data.loader - INFO - 成功加载 ../公开数据/数据补充/szs_enterprise_dust_clear_record_202603191738.csv，形状: (500, 18)
+2026-05-04 12:10:38,744 - data.loader - INFO - 成功加载 ../公开数据/数据补充/szs_ent_label_report_history_202603191747.csv，形状: (500, 10)
+2026-05-04 12:10:38,746 - data.loader - INFO - 成功加载 ../公开数据/数据补充/st_enterprise_production_status_record_202603191742.csv，形状: (500, 15)
+2026-05-04 12:10:38,749 - data.loader - INFO - 成功加载 ../公开数据/数据补充/st_enterprise_directory_202603191746.csv，形状: (500, 41)
+2026-05-04 12:10:38,757 - data.loader - INFO - 成功加载 ../公开数据/数据补充/szs_enterprise_risk_202603191750.csv，形状: (500, 29)
+2026-05-04 12:10:38,759 - data.loader - INFO - 成功加载 ../公开数据/数据补充/szs_enterprise_safety_202603191748.csv，形状: (500, 37)
+2026-05-04 12:10:38,764 - data.loader - INFO - 成功加载 ../公开数据/数据补充/szs_enterprise_risk_history_202603191750.csv，形状: (500, 46)
+2026-05-04 12:10:38,768 - data.loader - INFO - 成功加载 ../公开数据/数据补充/zjj_house_safety_identify_202603191014.csv，形状: (500, 28)
+2026-05-04 12:10:38,771 - data.loader - INFO - 成功加载 ../公开数据/数据补充/zjj_house_base_info_202603191015.csv，形状: (500, 58)
+2026-05-04 12:10:38,773 - data.loader - WARNING - 跳过文件 ../公开数据/数据补充/enterprise_routine_check_log.xlsx: 加载文件失败 ../公开数据/数据补充/enterprise_routine_check_log.xlsx: Excel file format cannot be determined, you must specify an engine manually.
+2026-05-04 12:10:38,773 - data.loader - INFO - 目录 ../公开数据/数据补充 共加载 20 个文件
+2026-05-04 12:10:38,773 - data.loader - WARNING - 表 szs_ent_label_202603191747 无法确定 join 键，跳过
+2026-05-04 12:10:38,773 - data.loader - WARNING - 表 szs_business_address_202603191749 无法确定 join 键，跳过
+2026-05-04 12:10:38,773 - data.loader - WARNING - 表 st_fxsb_enterprise_routine_check_trouble_202603191745 无法确定 join 键，跳过
+2026-05-04 12:10:38,773 - data.loader - WARNING - 表 enterprise_routine_check_plan_202603191744 无法确定 join 键，跳过
+2026-05-04 12:10:38,773 - data.loader - WARNING - 表 enterprise_routine_check_log_202603191745 无法确定 join 键，跳过
+2026-05-04 12:10:38,773 - data.loader - WARNING - 表 szs_enterprise_information_202603191751 无法确定 join 键，跳过
+2026-05-04 12:10:38,774 - data.loader - WARNING - 表 zjstreet2_gcj02_202603191013 无法确定 join 键，跳过
+2026-05-04 12:10:38,774 - data.loader - WARNING - 表 szs_risk_target_202603191737 无法确定 join 键，跳过
+2026-05-04 12:10:38,774 - data.loader - WARNING - 表 szs_enterprise_industry_category_202603191748 无法确定 join 键，跳过
+2026-05-04 12:10:38,774 - data.loader - WARNING - 表 szs_enterprise_volkswirtschaft_202603191749 无法确定 join 键，跳过
+2026-05-04 12:10:38,774 - data.loader - WARNING - 表 szs_enterprise_dust_clear_record_202603191738 无法确定 join 键，跳过
+2026-05-04 12:10:38,774 - data.loader - WARNING - 表 szs_ent_label_report_history_202603191747 无法确定 join 键，跳过
+2026-05-04 12:10:38,774 - data.loader - WARNING - 表 st_enterprise_production_status_record_202603191742 无法确定 join 键，跳过
+2026-05-04 12:10:38,774 - data.loader - WARNING - 表 st_enterprise_directory_202603191746 无法确定 join 键，跳过
+2026-05-04 12:10:38,774 - data.loader - WARNING - 表 szs_enterprise_risk_202603191750 无法确定 join 键，跳过
+2026-05-04 12:10:38,774 - data.loader - WARNING - 表 szs_enterprise_safety_202603191748 无法确定 join 键，跳过
+2026-05-04 12:10:38,774 - data.loader - WARNING - 表 szs_enterprise_risk_history_202603191750 无法确定 join 键，跳过
+2026-05-04 12:10:38,774 - data.loader - WARNING - 表 zjj_house_safety_identify_202603191014 无法确定 join 键，跳过
+2026-05-04 12:10:38,774 - data.loader - WARNING - 表 zjj_house_base_info_202603191015 无法确定 join 键，跳过
+2026-05-04 12:10:38,774 - data.loader - INFO - 多表合并完成，最终形状: (500, 38)
+2026-05-04 13:12:48,340 - model.train - INFO - Step 1: 加载数据...
+2026-05-04 13:12:48,340 - data.loader - INFO - 加载预合并训练集: /Users/kita/language/python/京东杯/公开数据/new_已清洗.csv
+2026-05-04 13:12:49,809 - data.loader - INFO - 成功加载 /Users/kita/language/python/京东杯/公开数据/new_已清洗.csv，形状: (80016, 215)
+2026-05-04 13:12:49,810 - model.train - INFO - Step 2: 时序排序...
+2026-05-04 13:12:49,940 - model.train - INFO - 数据已按时间列 'report_time' 严格排序
+2026-05-04 13:12:49,950 - model.train - INFO - Step 3: 特征工程...
+2026-05-04 13:12:49,964 - model.train - WARNING - 目标列 'new_level' 中有 7141 行无效标签，训练阶段将剔除
+2026-05-04 13:12:50,872 - data.preprocessor - INFO - 特征工程完成，输出形状: (72875, 69)
+2026-05-04 13:12:50,875 - data.preprocessor - INFO - Pipeline 已保存至 models/preprocessing_pipeline.pkl
+2026-05-04 13:12:50,885 - model.train - INFO - Step 4: 划分数据...
+2026-05-04 13:12:50,885 - model.train - INFO - 数据集划分: 训练集: 51012, 验证集: 14575, 测试集: 7288
+2026-05-04 13:12:50,886 - model.train - INFO - Step 5: 训练 Stacking 模型...
+2026-05-04 13:13:02,775 - model.stacking - INFO - 基学习器 multinomial_lr (logistic_regression) 已初始化
+2026-05-04 13:13:02,776 - model.stacking - INFO - 基学习器 xgboost (xgboost) 已初始化
+2026-05-04 13:13:02,776 - model.stacking - INFO - 基学习器 lightgbm (lightgbm) 已初始化
+2026-05-04 13:13:02,776 - model.stacking - INFO - 基学习器 catboost (catboost) 已初始化
+2026-05-04 13:13:02,776 - model.stacking - INFO - 基学习器 random_forest (random_forest) 已初始化
+2026-05-04 13:13:02,776 - model.stacking - INFO - 基学习器 mlp (mlp) 已初始化
+2026-05-04 13:13:02,776 - model.stacking - INFO - 基学习器 cnn1d (cnn1d) 已初始化
+2026-05-04 13:13:02,776 - model.stacking - INFO - 元学习器已初始化
+2026-05-04 13:13:02,781 - model.stacking - INFO - 时序交叉验证第 1 折

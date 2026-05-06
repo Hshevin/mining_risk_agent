@@ -16,6 +16,7 @@ export interface ScenarioSwitchResponse {
   memory_top_k: number;
 }
 
+<<<<<<< HEAD
 export type LLMProvider = string;
 
 export interface LLMConfigResponse {
@@ -41,6 +42,8 @@ export interface LLMUpdateRequest {
   max_retries?: number;
 }
 
+=======
+>>>>>>> e7cc200 (some changes)
 export interface ShapContribution {
   feature: string;
   contribution: number;
@@ -101,9 +104,13 @@ export interface NodeStatus {
   detail?: string;
   final_status?: string;
   predicted_level?: string;
+<<<<<<< HEAD
   error?: string;
   mock?: boolean;
   decision_response?: DecisionResponse;
+=======
+  mock?: boolean;
+>>>>>>> e7cc200 (some changes)
 }
 
 export interface DecisionResponse {

@@ -20,6 +20,7 @@ from typing import Any, Dict, List, Optional
 try:
     import chromadb
     from chromadb.config import Settings
+<<<<<<< HEAD
     _CHROMADB_IMPORT_ERROR = None
 except Exception as e:
     chromadb = None
@@ -32,6 +33,16 @@ try:
 except Exception as e:
     SentenceTransformer = None
     _SENTENCE_TRANSFORMERS_IMPORT_ERROR = e
+=======
+except ImportError:
+    chromadb = None
+    Settings = None
+
+try:
+    from sentence_transformers import SentenceTransformer
+except ImportError:
+    SentenceTransformer = None
+>>>>>>> e7cc200 (some changes)
 
 from utils.config import get_config
 from utils.logger import get_logger
@@ -211,11 +222,17 @@ class VectorStore:
         os.makedirs(persist_directory, exist_ok=True)
 
         if chromadb is None or Settings is None:
+<<<<<<< HEAD
             detail = f" 原始错误: {_CHROMADB_IMPORT_ERROR}" if _CHROMADB_IMPORT_ERROR else ""
             raise ImportError(
                 "VectorStore 需要可选依赖 chromadb。"
                 "请安装 `pip install -r requirements-rag.txt` 或 `pip install -r requirements-full.txt`。"
                 f"{detail}"
+=======
+            raise ImportError(
+                "VectorStore 需要可选依赖 chromadb。"
+                "请安装 `pip install -r requirements-rag.txt` 或 `pip install -r requirements-full.txt`。"
+>>>>>>> e7cc200 (some changes)
             )
         
         self.client = chromadb.PersistentClient(
@@ -229,6 +246,7 @@ class VectorStore:
 
     def _get_embedding_model(self) -> Any:
         if SentenceTransformer is None:
+<<<<<<< HEAD
             detail = (
                 f" 原始错误: {_SENTENCE_TRANSFORMERS_IMPORT_ERROR}"
                 if _SENTENCE_TRANSFORMERS_IMPORT_ERROR else ""
@@ -237,6 +255,11 @@ class VectorStore:
                 "VectorStore.embed 需要可选依赖 sentence-transformers。"
                 "请安装 `pip install -r requirements-rag.txt` 或 `pip install -r requirements-full.txt`。"
                 f"{detail}"
+=======
+            raise ImportError(
+                "VectorStore.embed 需要可选依赖 sentence-transformers。"
+                "请安装 `pip install -r requirements-rag.txt` 或 `pip install -r requirements-full.txt`。"
+>>>>>>> e7cc200 (some changes)
             )
         if self._embedding_model is None:
             logger.info(f"加载嵌入模型: {self.embedding_model_name}")

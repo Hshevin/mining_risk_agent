@@ -12,9 +12,12 @@ import type {
   HealthResponse,
   IterationStatus,
   IterationTriggerResponse,
+<<<<<<< HEAD
   LLMConfigResponse,
   LLMProvider,
   LLMUpdateRequest,
+=======
+>>>>>>> e7cc200 (some changes)
   NodeStatus,
   ScenarioSwitchResponse,
 } from "./types";
@@ -22,19 +25,25 @@ import type {
 const RAW_BASE = (import.meta.env.VITE_API_BASE as string | undefined) ?? "";
 // 去掉末尾斜杠以保证拼接稳定
 const API_BASE = RAW_BASE.replace(/\/$/, "");
+<<<<<<< HEAD
 const ADMIN_TOKEN = (import.meta.env.VITE_ADMIN_API_TOKEN as string | undefined) ?? "";
+=======
+>>>>>>> e7cc200 (some changes)
 
 function url(path: string): string {
   if (path.startsWith("http")) return path;
   return `${API_BASE}${path}`;
 }
 
+<<<<<<< HEAD
 function adminHeaders(extra?: HeadersInit): HeadersInit {
   return ADMIN_TOKEN
     ? { ...extra, "X-Admin-Token": ADMIN_TOKEN }
     : { ...extra };
 }
 
+=======
+>>>>>>> e7cc200 (some changes)
 async function jsonOrThrow<T>(resp: Response): Promise<T> {
   if (!resp.ok) {
     const text = await resp.text().catch(() => "");
@@ -59,7 +68,10 @@ export async function switchScenario(
   try {
     const resp = await fetch(url(`/api/v1/agent/scenario/${scenarioId}`), {
       method: "POST",
+<<<<<<< HEAD
       headers: adminHeaders(),
+=======
+>>>>>>> e7cc200 (some changes)
     });
     if (!resp.ok) return null;
     return (await resp.json()) as ScenarioSwitchResponse;
@@ -68,6 +80,7 @@ export async function switchScenario(
   }
 }
 
+<<<<<<< HEAD
 export async function fetchLLMConfig(): Promise<LLMConfigResponse | null> {
   try {
     const resp = await fetch(url("/api/v1/agent/llm"), {
@@ -116,12 +129,21 @@ export async function postDecision(
   enterpriseId: string,
   data: Record<string, unknown>,
   scenarioId?: string,
+=======
+export async function postDecision(
+  enterpriseId: string,
+  data: Record<string, unknown>,
+>>>>>>> e7cc200 (some changes)
 ): Promise<DecisionResponse | null> {
   try {
     const resp = await fetch(url("/api/v1/agent/decision"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+<<<<<<< HEAD
       body: JSON.stringify({ enterprise_id: enterpriseId, data, scenario_id: scenarioId }),
+=======
+      body: JSON.stringify({ enterprise_id: enterpriseId, data }),
+>>>>>>> e7cc200 (some changes)
     });
     if (!resp.ok) return null;
     return (await resp.json()) as DecisionResponse;
@@ -139,12 +161,20 @@ export async function streamDecision(
   data: Record<string, unknown>,
   onMessage: (msg: NodeStatus) => void,
   signal?: AbortSignal,
+<<<<<<< HEAD
   scenarioId?: string,
 ): Promise<DecisionResponse | null> {
   const resp = await fetch(url("/api/v1/agent/decision/stream"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ enterprise_id: enterpriseId, data, scenario_id: scenarioId }),
+=======
+): Promise<void> {
+  const resp = await fetch(url("/api/v1/agent/decision/stream"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ enterprise_id: enterpriseId, data }),
+>>>>>>> e7cc200 (some changes)
     signal,
   });
   if (!resp.ok || !resp.body) {
@@ -153,7 +183,10 @@ export async function streamDecision(
   const reader = resp.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
+<<<<<<< HEAD
   let finalDecision: DecisionResponse | null = null;
+=======
+>>>>>>> e7cc200 (some changes)
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
@@ -167,14 +200,20 @@ export async function streamDecision(
       if (!payload) continue;
       try {
         const obj = JSON.parse(payload) as NodeStatus;
+<<<<<<< HEAD
         if (obj.decision_response) finalDecision = obj.decision_response;
+=======
+>>>>>>> e7cc200 (some changes)
         onMessage(obj);
       } catch {
         // 忽略非 JSON 行
       }
     }
   }
+<<<<<<< HEAD
   return finalDecision;
+=======
+>>>>>>> e7cc200 (some changes)
 }
 
 export async function uploadDataFile(
@@ -235,7 +274,11 @@ export async function triggerIteration(): Promise<IterationTriggerResponse | nul
   try {
     const resp = await fetch(url("/api/v1/iteration/trigger"), {
       method: "POST",
+<<<<<<< HEAD
       headers: adminHeaders({ "Content-Type": "application/json" }),
+=======
+      headers: { "Content-Type": "application/json" },
+>>>>>>> e7cc200 (some changes)
       body: JSON.stringify({}),
     });
     if (!resp.ok) return null;
@@ -259,9 +302,13 @@ export async function queryAudit(
     Object.entries(params).forEach(([k, v]) => {
       if (v !== undefined && v !== null && v !== "") usp.set(k, String(v));
     });
+<<<<<<< HEAD
     const resp = await fetch(url(`/api/v1/audit/query?${usp.toString()}`), {
       headers: adminHeaders(),
     });
+=======
+    const resp = await fetch(url(`/api/v1/audit/query?${usp.toString()}`));
+>>>>>>> e7cc200 (some changes)
     if (!resp.ok) return [];
     return jsonOrThrow<AuditLogEntry[]>(resp);
   } catch {
