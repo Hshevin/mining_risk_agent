@@ -1,0 +1,10 @@
+node_modules
+dist
+dist-ssr
+dist-tsbuild-node
+*.tsbuildinfo
+*.local
+.env
+.env.local
+.vite
+.DS_Store

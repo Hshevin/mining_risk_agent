@@ -10,16 +10,18 @@ from typing import Any, AsyncGenerator, Dict, List, Optional
 
 import joblib
 import pandas as pd
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
+from api.security import require_admin_token
+from data.field_normalizer import normalize_enterprise_record
 from agent.workflow import DecisionWorkflow
 from data.preprocessor import FeatureEngineeringPipeline
 from harness.memory import HybridMemoryManager
 from harness.validation import ValidationPipeline
 from model.stacking import StackingRiskModel
-from utils.config import get_config
+from utils.config import LLMProviderConfig, get_config
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -39,7 +41,8 @@ _model: Optional[StackingRiskModel] = None
 _pipeline: Optional[FeatureEngineeringPipeline] = None
 _memory: Optional[HybridMemoryManager] = None
 _validator: Optional[ValidationPipeline] = None
-_workflow: Optional[DecisionWorkflow] = None
+_workflows: Dict[str, DecisionWorkflow] = {}
+_default_scenario_id = "chemical"
 
 
 def _load_model() -> StackingRiskModel:
@@ -83,11 +86,29 @@ def _get_validator() -> ValidationPipeline:
     return _validator
 
 
-def _get_workflow() -> DecisionWorkflow:
-    global _workflow
-    if _workflow is None:
-        _workflow = DecisionWorkflow(scenario_id="chemical")
-    return _workflow
+def _resolve_scenario_id(request: "DecisionRequest") -> str:
+    scenario_id = request.scenario_id or request.data.get("scenario_id") or _default_scenario_id
+    if scenario_id not in ("chemical", "metallurgy", "dust"):
+        raise HTTPException(
+            status_code=400,
+            detail="无效场景: %s，可选: chemical, metallurgy, dust" % scenario_id,
+        )
+    return scenario_id
+
+
+def _get_workflow(scenario_id: str = "chemical") -> DecisionWorkflow:
+    if scenario_id not in _workflows:
+        _workflows[scenario_id] = DecisionWorkflow(scenario_id=scenario_id)
+    return _workflows[scenario_id]
+
+
+def _mock_fallback_enabled() -> bool:
+    return os.getenv("MRA_ENABLE_MOCK_FALLBACK", "true").lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
 
 
 # =============================================================================
@@ -122,6 +143,7 @@ class QueryRequest(BaseModel):
 class DecisionRequest(BaseModel):
     enterprise_id: str
     data: Dict[str, Any]
+    scenario_id: Optional[str] = None
 
 
 class DecisionResponse(BaseModel):
@@ -141,6 +163,18 @@ class DecisionResponse(BaseModel):
     mock: bool = False
 
 
+class DecisionStreamMessage(BaseModel):
+    node: str
+    status: str
+    timestamp: Optional[float] = None
+    detail: Optional[str] = None
+    final_status: Optional[str] = None
+    predicted_level: Optional[str] = None
+    error: Optional[str] = None
+    mock: bool = False
+    decision_response: Optional[DecisionResponse] = None
+
+
 class ScenarioSwitchResponse(BaseModel):
     scenario_id: str
     scenario_name: str
@@ -151,14 +185,37 @@ class ScenarioSwitchResponse(BaseModel):
     memory_top_k: int
 
 
+class LLMConfigResponse(BaseModel):
+    provider: str
+    model: str
+    base_url: str
+    default_temperature: float
+    default_max_tokens: int
+    max_retries: int
+    has_api_key: bool
+    available_providers: List[str] = Field(default_factory=list)
+    message: str = ""
+
+
+class LLMUpdateRequest(BaseModel):
+    provider: str
+    model: Optional[str] = None
+    base_url: Optional[str] = None
+    api_key: Optional[str] = None
+    api_key_env: Optional[str] = None
+    default_temperature: Optional[float] = None
+    default_max_tokens: Optional[int] = None
+    max_retries: Optional[int] = None
+
+
 # =============================================================================
 # Mock 数据生成器（当 Workflow 不可用时降级返回）
 # =============================================================================
 
 def _generate_mock_decision(request: DecisionRequest) -> DecisionResponse:
     """生成严格对齐 README 示例格式的 Mock 决策响应，支持场景化差异"""
-    # 优先从请求数据中推断场景，否则默认 chemical
-    scenario_id = request.data.get("scenario_id", "chemical")
+    # 优先使用请求级场景，其次兼容旧 payload 中的 scenario_id
+    scenario_id = request.scenario_id or request.data.get("scenario_id", "chemical")
     if scenario_id not in ("chemical", "metallurgy", "dust"):
         scenario_id = "chemical"
 
@@ -213,6 +270,41 @@ def _fallback_mock_decision(enterprise_id: str, scenario_id: str) -> Dict[str, A
     }
 
 
+def _build_decision_response(
+    request: DecisionRequest,
+    final_state: Dict[str, Any],
+) -> DecisionResponse:
+    prediction = final_state.get("prediction") or {}
+    decision_data = final_state.get("decision") or {}
+
+    return DecisionResponse(
+        enterprise_id=request.enterprise_id,
+        scenario_id=final_state.get("scenario_id") or _resolve_scenario_id(request),
+        final_status=final_state.get("final_status", "UNKNOWN"),
+        predicted_level=prediction.get("predicted_level", ""),
+        probability_distribution=prediction.get("probability_distribution", {}),
+        shap_contributions=prediction.get("shap_contributions", []),
+        risk_level_and_attribution=decision_data.get("risk_level_and_attribution", {}),
+        government_intervention=decision_data.get("government_intervention", {}),
+        enterprise_control=decision_data.get("enterprise_control", {}),
+        march_result=final_state.get("march_result"),
+        monte_carlo_result=final_state.get("monte_carlo_result"),
+        three_d_risk=final_state.get("three_d_risk"),
+        node_status=final_state.get("node_status", []),
+    )
+
+
+def _validate_workflow_state(final_state: Dict[str, Any]) -> None:
+    prediction = final_state.get("prediction") or {}
+    if (
+        not prediction.get("predicted_level")
+        or final_state.get("final_status") in (None, "UNKNOWN", "")
+        or final_state.get("error")
+    ):
+        detail = final_state.get("error") or "Workflow 返回结果不完整"
+        raise RuntimeError(str(detail))
+
+
 # =============================================================================
 # 原有接口（保持不变）
 # =============================================================================
@@ -223,9 +315,18 @@ async def predict(request: PredictRequest) -> PredictResponse:
     try:
         model = _load_model()
         pipeline = _load_pipeline()
-        
-        df = pd.DataFrame([request.data])
-        df["企业ID"] = request.enterprise_id
+
+        normalized, report = normalize_enterprise_record(
+            request.data,
+            enterprise_id=request.enterprise_id,
+        )
+        logger.info(
+            "预测输入字段标准化完成: mapped=%s defaulted_count=%s",
+            report.mapped_fields,
+            len(report.defaulted_fields),
+        )
+
+        df = pd.DataFrame([normalized])
         
         X = pipeline.transform(df)
         
@@ -323,48 +424,29 @@ async def decision(request: DecisionRequest) -> Any:
     返回包含政府干预（department_primary/actions/deadline_hours）
     与企业管控（equipment_id/operation/parameters）的结构化决策
 
-    若 Workflow 初始化失败（如 GLM-5 API 不可用、模型未训练），
-    降级返回 Mock 数据，HTTP 200，并附加 mock=true 标记。
+    默认保留演示降级；生产环境可设置 MRA_ENABLE_MOCK_FALLBACK=false，
+    使 Workflow 失败时返回 503，避免真实故障被 HTTP 200 掩盖。
     """
     try:
-        workflow = _get_workflow()
+        scenario_id = _resolve_scenario_id(request)
+        workflow = _get_workflow(scenario_id)
         final_state = await workflow.run_async(
             enterprise_id=request.enterprise_id,
             raw_data=request.data,
         )
 
         prediction = final_state.get("prediction") or {}
-        decision_data = final_state.get("decision") or {}
-
-        # 判定是否真正可用：prediction 必须有 predicted_level，且 final_status 不为 UNKNOWN
-        # 若模型未训练、Pipeline 缺失、GLM-5 返回空等导致结果为空，强制降级 Mock
-        is_valid = (
-            prediction.get("predicted_level")
-            and final_state.get("final_status") not in (None, "UNKNOWN", "")
-            and not final_state.get("error")
-        )
-
-        if not is_valid:
-            logger.warning("Workflow 返回结果不完整，降级至 Mock")
+        try:
+            _validate_workflow_state(final_state)
+        except RuntimeError as invalid_err:
+            if not _mock_fallback_enabled():
+                raise HTTPException(status_code=503, detail=str(invalid_err)) from invalid_err
+            logger.warning("Workflow 返回结果不完整，降级至 Mock: %s", invalid_err)
             mock_resp = _generate_mock_decision(request)
             mock_resp.mock = True
             return mock_resp
 
-        resp = DecisionResponse(
-            enterprise_id=request.enterprise_id,
-            scenario_id=final_state.get("scenario_id", "chemical"),
-            final_status=final_state.get("final_status", "UNKNOWN"),
-            predicted_level=prediction.get("predicted_level", ""),
-            probability_distribution=prediction.get("probability_distribution", {}),
-            shap_contributions=prediction.get("shap_contributions", []),
-            risk_level_and_attribution=decision_data.get("risk_level_and_attribution", {}),
-            government_intervention=decision_data.get("government_intervention", {}),
-            enterprise_control=decision_data.get("enterprise_control", {}),
-            march_result=final_state.get("march_result"),
-            monte_carlo_result=final_state.get("monte_carlo_result"),
-            three_d_risk=final_state.get("three_d_risk"),
-            node_status=final_state.get("node_status", []),
-        )
+        resp = _build_decision_response(request, final_state)
         # 写入审计日志
         try:
             from api.routers.audit import AuditLogRequest, log_audit
@@ -378,7 +460,12 @@ async def decision(request: DecisionRequest) -> Any:
         except Exception as audit_err:
             logger.warning(f"审计日志写入失败: {audit_err}")
         return resp
+    except HTTPException:
+        raise
     except Exception as e:
+        if not _mock_fallback_enabled():
+            logger.error(f"决策工作流执行失败: {e}")
+            raise HTTPException(status_code=503, detail=str(e)) from e
         logger.error(f"决策工作流执行失败，降级至 Mock: {e}")
         mock_resp = _generate_mock_decision(request)
         mock_resp.mock = True
@@ -388,12 +475,13 @@ async def decision(request: DecisionRequest) -> Any:
 async def _mock_decision_stream(
     enterprise_id: str,
     raw_data: Dict[str, Any],
+    scenario_id: str,
 ) -> AsyncGenerator[str, None]:
     """Mock SSE 流，当 Workflow 不可用时使用"""
     import asyncio
-    scenario_id = raw_data.get("scenario_id", "chemical")
-    if scenario_id not in ("chemical", "metallurgy", "dust"):
-        scenario_id = "chemical"
+    request = DecisionRequest(enterprise_id=enterprise_id, data=raw_data, scenario_id=scenario_id)
+    mock_resp = _generate_mock_decision(request)
+    mock_resp.mock = True
     
     mock_nodes = [
         {"node": "data_ingestion", "status": "completed", "detail": f"Mock: 特征工程完成（场景={scenario_id}）"},
@@ -401,7 +489,14 @@ async def _mock_decision_stream(
         {"node": "memory_recall", "status": "completed", "detail": "Mock: 长期记忆召回完成"},
         {"node": "decision_generation", "status": "completed", "detail": "Mock: 决策生成与校验完成"},
         {"node": "result_push", "status": "completed", "detail": "Mock: 结果推送完成"},
-        {"node": "workflow", "status": "completed", "final_status": "APPROVE", "predicted_level": "红", "mock": True},
+        {
+            "node": "workflow",
+            "status": "completed",
+            "final_status": mock_resp.final_status,
+            "predicted_level": mock_resp.predicted_level,
+            "mock": True,
+            "decision_response": mock_resp.model_dump(),
+        },
     ]
     for item in mock_nodes:
         await asyncio.sleep(0.3)
@@ -411,10 +506,13 @@ async def _mock_decision_stream(
 async def _decision_stream(
     enterprise_id: str,
     raw_data: Dict[str, Any],
+    scenario_id: str,
 ) -> AsyncGenerator[str, None]:
     """SSE 流式输出决策工作流节点状态"""
+    request = DecisionRequest(enterprise_id=enterprise_id, data=raw_data, scenario_id=scenario_id)
     try:
-        workflow = _get_workflow()
+        workflow = _get_workflow(scenario_id)
+        final_state: Dict[str, Any] = {}
         # 使用 astream 获取中间状态流
         async for state in workflow.graph.astream({
             "enterprise_id": enterprise_id,
@@ -429,42 +527,148 @@ async def _decision_stream(
             "retry_count": 0,
             "final_status": "UNKNOWN",
             "node_status": [],
-            "scenario_id": workflow.scenario.scenario_id,
+            "scenario_id": scenario_id,
             "error": None,
         }):
             # state 是 dict，key 为节点名，value 为 AgentState
             for node_name, node_state in state.items():
+                if not isinstance(node_state, dict):
+                    continue
+                final_state = node_state
                 node_status_list = node_state.get("node_status", [])
                 if node_status_list:
                     latest = node_status_list[-1]
                     yield f"data: {_json.dumps(latest, ensure_ascii=False)}\n\n"
 
-        # 最终输出完整结果
-        final_state = await workflow.run_async(enterprise_id=enterprise_id, raw_data=raw_data)
+        # astream 已经执行完整工作流，避免再次 run_async 造成重复日志与重复模型调用。
+        prediction = final_state.get("prediction") or {}
+        try:
+            _validate_workflow_state(final_state)
+            decision_response = _build_decision_response(request, final_state).model_dump()
+            status = "completed"
+            error = None
+        except RuntimeError as invalid_err:
+            decision_response = None
+            status = "failed"
+            error = str(invalid_err)
+
         summary = {
             "node": "workflow",
-            "status": "completed",
+            "status": status,
             "final_status": final_state.get("final_status"),
-            "predicted_level": final_state.get("prediction", {}).get("predicted_level"),
+            "predicted_level": prediction.get("predicted_level"),
+            "error": error,
+            "decision_response": decision_response,
         }
         yield f"data: {_json.dumps(summary, ensure_ascii=False)}\n\n"
     except Exception as e:
+        if not _mock_fallback_enabled():
+            logger.error(f"SSE 流式输出失败: {e}")
+            error_msg = {
+                "node": "workflow",
+                "status": "failed",
+                "error": str(e),
+            }
+            yield f"data: {_json.dumps(error_msg, ensure_ascii=False)}\n\n"
+            return
         logger.error(f"SSE 流式输出失败，降级至 Mock 流: {e}")
-        async for chunk in _mock_decision_stream(enterprise_id, raw_data):
+        async for chunk in _mock_decision_stream(enterprise_id, raw_data, scenario_id):
             yield chunk
 
 
 @agent_router.post("/decision/stream")
 async def decision_stream(request: DecisionRequest) -> StreamingResponse:
     """SSE 流式输出决策工作流节点状态"""
+    scenario_id = _resolve_scenario_id(request)
     return StreamingResponse(
-        _decision_stream(request.enterprise_id, request.data),
+        _decision_stream(request.enterprise_id, request.data, scenario_id),
         media_type="text/event-stream",
     )
 
 
+def _build_llm_config_response(message: str = "") -> LLMConfigResponse:
+    config = get_config()
+    llm_cfg = config.llm.active
+    return LLMConfigResponse(
+        provider=config.llm.provider,
+        model=llm_cfg.model,
+        base_url=llm_cfg.base_url,
+        default_temperature=llm_cfg.default_temperature,
+        default_max_tokens=llm_cfg.default_max_tokens,
+        max_retries=llm_cfg.max_retries,
+        has_api_key=bool(llm_cfg.api_key),
+        available_providers=config.llm.available_provider_names,
+        message=message,
+    )
+
+
+@agent_router.get("/llm", response_model=LLMConfigResponse)
+async def get_llm_config(
+    _: None = Depends(require_admin_token),
+) -> LLMConfigResponse:
+    """返回当前 LLM 提供方与模型配置，供前端展示。"""
+    return _build_llm_config_response()
+
+
+@agent_router.post("/llm/{provider}", response_model=LLMConfigResponse)
+async def switch_llm_provider(
+    provider: str,
+    _: None = Depends(require_admin_token),
+) -> LLMConfigResponse:
+    """
+    切换当前运行时 LLM 提供方。
+    provider 来自配置中的 llm.providers，或由前端自定义创建。
+    该切换只影响当前后端进程，重启后仍以配置文件或环境变量为准。
+    """
+    normalized = provider.lower()
+
+    try:
+        config = get_config()
+        if normalized not in config.llm.providers:
+            config.llm.providers[normalized] = LLMProviderConfig(model=normalized)
+        config.llm.provider = normalized
+        logger.info(f"LLM provider 已切换为: {normalized}")
+        return _build_llm_config_response(f"LLM 已切换为 {normalized}")
+    except Exception as e:
+        logger.error(f"LLM provider 切换失败: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@agent_router.post("/llm", response_model=LLMConfigResponse)
+async def update_llm_config(
+    request: LLMUpdateRequest,
+    _: None = Depends(require_admin_token),
+) -> LLMConfigResponse:
+    """
+    创建或更新任意 OpenAI 兼容 LLM provider，并切换为当前运行时配置。
+    不持久化写回 config.yaml；如需重启后保留，请同步写入配置文件或环境变量。
+    """
+    provider = request.provider.strip().lower()
+    if not provider:
+        raise HTTPException(status_code=400, detail="provider 不能为空")
+
+    try:
+        config = get_config()
+        current = config.llm.providers.get(provider, LLMProviderConfig())
+        updates = request.model_dump(exclude_unset=True)
+        updates.pop("provider", None)
+        for key, value in updates.items():
+            if value is not None:
+                setattr(current, key, value)
+        config.llm.providers[provider] = current
+        config.llm.provider = provider
+        logger.info(f"LLM provider 已更新并切换为: {provider}")
+        return _build_llm_config_response(f"LLM 配置已更新为 {provider}")
+    except Exception as e:
+        logger.error(f"LLM 配置更新失败: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @agent_router.post("/scenario/{scenario_id}", response_model=ScenarioSwitchResponse)
-async def switch_scenario(scenario_id: str) -> ScenarioSwitchResponse:
+async def switch_scenario(
+    scenario_id: str,
+    _: None = Depends(require_admin_token),
+) -> ScenarioSwitchResponse:
     """
     切换当前场景配置
     支持: chemical（危化品）/ metallurgy（冶金）/ dust（粉尘涉爆）
@@ -478,8 +682,9 @@ async def switch_scenario(scenario_id: str) -> ScenarioSwitchResponse:
         )
     
     try:
-        workflow = _get_workflow()
-        workflow.set_scenario(scenario_id)
+        global _default_scenario_id
+        _default_scenario_id = scenario_id
+        workflow = _get_workflow(scenario_id)
         scenario_name = workflow.scenario.cfg["name"]
         
         return ScenarioSwitchResponse(

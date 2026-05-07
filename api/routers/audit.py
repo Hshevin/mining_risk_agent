@@ -6,9 +6,10 @@ import sqlite3
 import time
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
+from api.security import require_admin_token
 from utils.config import get_config
 from utils.logger import get_logger
 
@@ -56,7 +57,10 @@ class AuditLogRequest(BaseModel):
 
 
 @router.post("/log")
-async def log_audit(request: AuditLogRequest) -> Dict[str, str]:
+async def log_audit(
+    request: AuditLogRequest,
+    _: None = Depends(require_admin_token),
+) -> Dict[str, str]:
     """写入审计日志"""
     db_path = _get_audit_db()
     conn = sqlite3.connect(db_path)
@@ -78,6 +82,7 @@ async def query_audit(
     risk_level: Optional[str] = None,
     limit: int = Query(100, ge=1, le=1000),
     offset: int = Query(0, ge=0),
+    _: None = Depends(require_admin_token),
 ) -> List[Dict[str, Any]]:
     """查询审计日志"""
     db_path = _get_audit_db()

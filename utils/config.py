@@ -4,11 +4,12 @@
 """
 
 import os
+import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import yaml
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class ProjectConfig(BaseModel):
@@ -20,18 +21,22 @@ class ProjectConfig(BaseModel):
 class DataConfig(BaseModel):
     raw_data_path: str
     reference_data_path: str
+    merged_data_path: Optional[str] = None  # 预合并训练集路径（new_已清洗.csv）
     supported_formats: List[str]
     encoding: str = "utf-8-sig"
     batch_size: int = 1000
+    table_join_keys: Optional[Dict[str, Any]] = None  # 各原始表的主键/外键映射
 
 
 class FeatureConfig(BaseModel):
+    target_column: str = "new_level"  # 目标列（A/B/C/D）
     id_columns: List[str]
     binary_columns: List[str]
     numeric_columns: List[str]
     enum_columns: List[str]
     text_columns: List[str]
     industry_columns: List[str]
+    special_features: Optional[Dict[str, Any]] = None  # 特殊逻辑特征列显式映射
     missing_value_strategy: Dict[str, Any]
     outlier_clip_quantile: float = 0.99
 
@@ -213,13 +218,76 @@ class IterationConfig(BaseModel):
     webhook_url: str = ""
 
 
-class GLM5Config(BaseModel):
-    model: str = "glm-5"
+def _env_prefix(provider: str) -> str:
+    """将 provider 名转换成可用于环境变量的前缀。"""
+    return re.sub(r"[^A-Z0-9]+", "_", provider.upper()).strip("_")
+
+
+class LLMProviderConfig(BaseModel):
+    model: str = ""
     api_key: str = ""
-    base_url: str = "https://open.bigmodel.cn/api/paas/v4/"
+    api_key_env: str = ""
+    base_url: str = ""
     default_temperature: float = 0.3
     default_max_tokens: int = 8192
     max_retries: int = 3
+
+
+class LLMConfig(BaseModel):
+    provider: str = "glm5"
+    providers: Dict[str, LLMProviderConfig] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def _apply_env_override(self) -> "LLMConfig":
+        env_provider = os.getenv("LLM_PROVIDER")
+        if env_provider:
+            self.provider = env_provider
+        self.provider = self.provider.lower()
+
+        self.providers = {
+            name.lower(): cfg for name, cfg in self.providers.items()
+        }
+        if not self.providers:
+            self.providers[self.provider] = LLMProviderConfig(
+                model=os.getenv("LLM_MODEL", self.provider),
+                base_url=os.getenv("LLM_BASE_URL", ""),
+            )
+        if self.provider not in self.providers:
+            self.providers[self.provider] = LLMProviderConfig(
+                model=os.getenv("LLM_MODEL", self.provider),
+                base_url=os.getenv("LLM_BASE_URL", ""),
+            )
+
+        for name, cfg in self.providers.items():
+            prefix = _env_prefix(name)
+            env_key = (
+                os.getenv(cfg.api_key_env)
+                if cfg.api_key_env
+                else None
+            ) or os.getenv(f"LLM_{prefix}_API_KEY")
+            env_model = os.getenv(f"LLM_{prefix}_MODEL")
+            env_base_url = os.getenv(f"LLM_{prefix}_BASE_URL")
+
+            if name == self.provider:
+                env_key = os.getenv("LLM_API_KEY") or env_key or os.getenv("OPENAI_API_KEY")
+                env_model = os.getenv("LLM_MODEL") or env_model
+                env_base_url = os.getenv("LLM_BASE_URL") or env_base_url
+
+            if env_key:
+                cfg.api_key = env_key
+            if env_model:
+                cfg.model = env_model
+            if env_base_url:
+                cfg.base_url = env_base_url
+        return self
+
+    @property
+    def active(self) -> LLMProviderConfig:
+        return self.providers[self.provider]
+
+    @property
+    def available_provider_names(self) -> List[str]:
+        return sorted(self.providers.keys())
 
 
 class SingleScenarioConfig(BaseModel):
@@ -244,8 +312,8 @@ class AppConfig(BaseModel):
     features: FeatureConfig
     model: ModelConfig
     harness: HarnessConfig
-    llm: Dict[str, Any] = Field(default_factory=dict)
-    scenarios: Dict[str, Any] = Field(default_factory=dict)
+    llm: LLMConfig = Field(default_factory=LLMConfig)
+    scenarios: ScenariosConfig
     api: APIConfig
     frontend: FrontendConfig
     logging: LoggingConfig

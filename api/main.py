@@ -19,6 +19,14 @@ from utils.logger import get_logger
 logger = get_logger(__name__)
 
 
+def _get_cors_origins() -> List[str]:
+    raw = os.getenv(
+        "MRA_CORS_ORIGINS",
+        "http://localhost:8501,http://127.0.0.1:8501,http://localhost:5173,http://127.0.0.1:5173",
+    )
+    return [origin.strip() for origin in raw.split(",") if origin.strip()]
+
+
 def create_app() -> FastAPI:
     """创建 FastAPI 应用实例"""
     config = get_config()
@@ -37,11 +45,13 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
     
+    cors_origins = _get_cors_origins()
+
     # CORS
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
-        allow_credentials=True,
+        allow_origins=cors_origins,
+        allow_credentials="*" not in cors_origins,
         allow_methods=["*"],
         allow_headers=["*"],
     )

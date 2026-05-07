@@ -8,100 +8,168 @@ project:
 
 # 数据配置
 data:
-  raw_data_path: "../公开数据/公开数据/数据补充"
-  reference_data_path: "../公开数据/公开数据/数据参考"
+  raw_data_path: "../公开数据/数据补充"
+  reference_data_path: "../公开数据/数据参考"
+  merged_data_path: "../公开数据/new_已清洗.csv"  # 预合并训练集（80016行×215列）
   supported_formats: ["csv", "xlsx", "json"]
   encoding: "utf-8-sig"
   batch_size: 1000
-  
-# 特征工程配置
+
+  # 各原始表的主键/外键映射（用于 merge_enterprise_tables）
+  table_join_keys:
+    szs_enterprise_information:
+      primary_key: "主键ID"
+      report_key: "报告历史id"
+    szs_enterprise_risk_history:
+      primary_key: "主键ID"
+      enterprise_key: "企业ID"
+    szs_enterprise_risk:
+      report_key: "报告历史ID"
+    szs_enterprise_safety:
+      report_key: "报告历史ID"
+    st_enterprise_directory:
+      credit_code_key: "社会统一信用代码 主键"
+    szs_enterprise_dust_clear_record:
+      credit_code_key: "统一信用代码"
+
+# 特征工程配置（对齐 new_已清洗.csv 的实际列名）
 features:
-  # 主键字段（不参与评分）
+  # 目标列
+  target_column: "new_level"          # A/B/C/D 四级风险
+
+  # 主键字段（不参与特征）
   id_columns:
-    - "主键ID"
-    - "企业ID"
-    - "统一社会信用代码"
-    - "生产经营地址id"
-  
+    - "enterprise_id"
+    - "enterprise_name"
+    - "latest_risk_report_id"
+    - "Unnamed: 0"
+
   # 二值型字段
   binary_columns:
-    - "是否发生事故"
-    - "是否发生事件"
-    - "是否发现问题隐患 0-否 1-是"
-    - "防控措施是否有效落实 1是 0否"
-    - "是否投保"
-    - "是否履行\"三同时\"手续"
-    - "是否规上企业"
-    - "是否上报风险报告"
-  
+    - "above_designated"              # 是否规上企业
+    - "if_insure"                     # 是否投保
+    - "if_comply_formality"           # 是否履行三同时手续
+    # if_certificate 在当前训练集中 100% 缺失，暂不纳入训练特征
+    - "factory_in_factory"            # 厂中厂
+    - "has_risk_item"                 # 有风险项
+    - "is_explosive_dust"             # 爆炸性粉尘企业
+    - "is_ammonia_refrigerating"      # 氨制冷企业
+    - "is_finite_space"               # 有限空间企业
+    - "is_major_hazards"              # 重大危险源
+    - "is_metal_smelter"              # 金属冶炼企业
+    - "is_gas_company"                # 燃气企业
+    - "confined_spaces_enterprise"    # 有限空间作业企业
+    - "dangerous_chemical_enterprise" # 危化品企业
+    - "risk_accident_flag"            # 曾发生事故
+    - "risk_company_flag"             # 风险重点企业
+    - "risk_company_key_flag"         # 关键风险企业
+    - "if_valid"                      # 数据有效标识
+
   # 数值型字段
   numeric_columns:
-    - "从业人员本科占比"
-    - "上一年人员流动率"
-    - "专职安全生产管理人持证员数"
-    - "兼职安全生产管理人持证员数"
-    - "特种作业人数持证人数"
-    - "安全生产投入占比"
-    - "上一年经营收入"
-    - "固定资产"
-    - "企业职工总人数"
-    - "企业职工外用总人数"
-    - "企业安全管理人员数量"
-    - "专职安全生产管理人员数"
-    - "兼职安全生产管理人员数"
-    - "部门安全管理人员数量"
-    - "投保金额"
-    - "工伤保险支出（万元）"
-    - "投保人数"
-  
+    - "staff_num"                     # 企业职工总人数
+    - "safety_num"                    # 安全管理人员数量
+    - "fulltime_safety_num"           # 专职安全管理人员数
+    - "parttime_safety_num"           # 兼职安全管理人员数
+    - "safety_dept_num"               # 部门安全管理人员数量
+    - "fulltime_cert_num"             # 专职安全管理人持证员数
+    - "parttime_cert_num"             # 兼职安全管理人持证员数
+    - "special_work_cert_num"         # 特种作业持证人数
+    # safety_invest 在当前训练集中 100% 缺失，暂不纳入训练特征
+    - "last_year_income"              # 上一年经营收入
+    - "fixed_assets"                  # 固定资产
+    - "insure_money"                  # 投保金额
+    - "injury_insurance"              # 工伤保险支出（万元）
+    - "insure_num"                    # 投保人数
+    - "last_year_turnover"            # 上一年人员流动率
+    - "risk_total_count"              # 总风险数
+    - "risk_level_a_count"            # A级风险数
+    - "risk_level_b_count"            # B级风险数
+    - "risk_level_c_count"            # C级风险数
+    - "risk_level_d_count"            # D级风险数
+    - "risk_with_accident_count"      # 曾发事故的风险数
+    - "check_total_count"             # 检查总次数
+    - "check_trouble_count"           # 检查发现问题次数
+    - "trouble_total_count"           # 隐患总数
+    - "trouble_level_1_count"         # 一般隐患数
+    - "trouble_level_2_count"         # 重大隐患数
+    - "trouble_unrectified_count"     # 未整改隐患数
+    - "writ_total_count"              # 文书总数
+    - "writ_from_case_count"          # 立案文书数
+    - "writ_from_check_count"         # 检查文书数
+    - "total_penalty_money"           # 处罚金额
+    - "dust_ganshi_num"               # 干式除尘系统数量
+    - "dust_shishi_num"               # 湿式除尘系统数量
+    - "gaolu_num"                     # 高炉数量
+    - "zhuanlu_num"                   # 转炉数量
+    - "dianlu_num"                    # 电炉数量
+    - "dust_clear_count"              # 除尘作业次数
+
   # 枚举型字段
   enum_columns:
-    - "管理类别"
-    - "风险等级"
-    - "行业监管大类"
-    - "行业监管小类"
-    - "企业规模"
-    - "法人类型"
-    - "企业类型"
-    - "登记状态"
-    - "经营状态   0：正常，1：注销,2歇业"
-    - "安全生产标准化建设情况"
-    - "安全等级"
-  
-  # 文本型字段
-  text_columns:
-    - "具体风险描述"
-    - "管控措施"
-    - "管控措施详细信息"
-    - "整改意见"
-    - "经营范围"
-    - "主营业务及产品"
-    - "工艺流程内容"
-    - "备注"
-  
+    - "supervision_large"             # 行业监管大类
+    - "safety_build"                  # 安全生产标准化建设情况
+    - "rh_production_status"          # 生产状态
+    - "business_status"               # 经营状态
+
+  # 文本型字段（预合并数据中文本已聚合为数值，此节留空）
+  text_columns: []
+
   # 行业分类字段
   industry_columns:
-    - "国民经济门类"
-    - "国民经济大类"
-    - "国民经济中类"
-    - "国民经济小类"
-    - "行业监管分类-大类"
-  
+    - "indus_type_class"              # 国民经济门类
+    - "indus_type_large"              # 国民经济大类
+    - "indus_type_middle"             # 国民经济中类
+    - "indus_type_small"              # 国民经济小类
+    - "supervision_large"             # 行业监管大类
+
+  # 特殊逻辑特征列（明确指定，消除模糊探测）
+  special_features:
+    dust_removal:
+      dry_col: "dust_ganshi_num"
+      wet_col: "dust_shishi_num"
+    confined_space_cols:
+      - "is_finite_space"
+      - "confined_spaces_enterprise"
+      - "risk_finite_key_flag"
+    hazardous_chemical_cols:
+      - "dangerous_chemical_enterprise"
+      - "is_ammonia_refrigerating"
+      - "risk_whp_flag"
+      - "risk_whp_use_flag"
+    time_col: "report_time"
+    # report_time 缺失时按高风险信号处理，避免误判为“历史旧数据”
+    time_decay_missing_weight: 1.0
+    time_decay_value_cols:
+      - "trouble_total_count"
+      - "risk_total_count"
+      - "check_total_count"
+    geo_fence:
+      lon_col: "dir_longitude"
+      lat_col: "dir_latitude"
+    enterprise_id_col: "enterprise_id"
+    hazard_cols:
+      - "trouble_total_count"
+      - "trouble_level_2_count"
+      - "risk_with_accident_count"
+    document_cols:
+      - "writ_total_count"
+      - "writ_from_case_count"
+      - "writ_from_check_count"
+
   # 缺失值处理策略
   missing_value_strategy:
     management_fields:
       strategy: "high_score"
       fields:
-        - "安全生产标准化建设情况"
-        - "安全等级"
-        - "安全管理部门"
+        - "safety_build"
+        - "if_comply_formality"
     objective_fields:
       strategy: "mean_imputation"
       fields:
-        - "从业人员本科占比"
-        - "上一年人员流动率"
-        - "安全生产投入占比"
-  
+        - "last_year_turnover"
+        - "last_year_income"
+
   # 极端值截断阈值（分位数）
   outlier_clip_quantile: 0.99
 
@@ -167,32 +235,6 @@ model:
           min_samples_split: 5
           min_samples_leaf: 2
           max_features: "sqrt"
-      
-      - name: "mlp"
-        type: "mlp"
-        params:
-          hidden_layers: [128, 64]
-          dropout_rate: 0.3
-          activation: "relu"
-          epochs: 20
-          batch_size: 32
-          learning_rate: 0.001
-          early_stopping_patience: 5
-      
-      - name: "cnn1d"
-        type: "cnn1d"
-        params:
-          conv_layers:
-            - filters: 64
-              kernel_size: 3
-            - filters: 128
-              kernel_size: 3
-          dense_units: 64
-          dropout_rate: 0.3
-          epochs: 20
-          batch_size: 32
-          learning_rate: 0.001
-          early_stopping_patience: 5
     
     # 元学习器配置
     meta_learner:
@@ -217,7 +259,7 @@ model:
       val: 0.2
       test: 0.1
     
-    # 模型保存路径
+    # 模型保存路径（当前使用 stable 训练产物，文件名与 README 默认一致便于 API/前端加载）
     model_path: "models/stacking_risk_v1.pkl"
     pipeline_path: "models/preprocessing_pipeline.pkl"
   
@@ -284,6 +326,7 @@ harness:
         - "memory/系统日志归档.md"
       
       rag:
+        enabled: false  # Docker API 默认关闭 RAG，避免 native embedding 依赖拖垮主服务
         embedding_model: "BAAI/bge-large-zh-v1.5"
         reranker_model: "BAAI/bge-reranker-large"
         top_k_retrieval: 10
@@ -365,13 +408,24 @@ logging:
 
 # LLM 配置
 llm:
-  glm5:
-    model: "glm-5"
-    api_key: "b58406e37c1247a78ff5e01e093d7370.1lBWG4vQJtQbPxAF"
-    base_url: "https://open.bigmodel.cn/api/paas/v4/"
-    default_temperature: 0.3
-    default_max_tokens: 8192
-    max_retries: 3
+  provider: "glm5"  # 当前启用的 provider；也可用环境变量 LLM_PROVIDER 覆盖
+  providers:
+    # 任意 OpenAI Chat Completions 兼容模型都可新增一个 provider。
+    # api_key_env 指向密钥所在环境变量名，避免把密钥写进配置文件。
+    glm5:
+      model: "glm-5"
+      base_url: "https://open.bigmodel.cn/api/paas/v4/"
+      api_key_env: "GLM5_API_KEY"
+      default_temperature: 0.3
+      default_max_tokens: 8192
+      max_retries: 3
+    deepseek:
+      model: "deepseek-chat"
+      base_url: "https://api.deepseek.com"
+      api_key_env: "DEEPSEEK_API_KEY"
+      default_temperature: 0.3
+      default_max_tokens: 8192
+      max_retries: 3
 
 # 场景化配置
 scenarios:

@@ -2,18 +2,19 @@
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-009688.svg)](https://fastapi.tiangolo.com)
-[![Streamlit](https://img.shields.io/badge/Streamlit-1.28+-FF4B4B.svg)](https://streamlit.io)
+[![React](https://img.shields.io/badge/React-18-61DAFB.svg)](https://react.dev)
+[![Vite](https://img.shields.io/badge/Vite-5-646CFF.svg)](https://vitejs.dev)
 [![License](https://img.shields.io/badge/license-Research-orange.svg)]()
 
-> **一句话介绍**：基于 Harness 工程化管控的工矿企业风险预警 LLM 智能体系统，支持 Stacking 集成学习预测、GLM-5 决策智能体 Workflow、三重校验风控拦截、模型自动迭代 CI/CD，配套 Streamlit 多标签页演示级 Dashboard。
+> **一句话介绍**：基于 Harness 工程化管控的工矿企业风险预警 LLM 智能体系统，支持 Stacking 集成学习预测、GLM-5 决策智能体 Workflow、三重校验风控拦截、模型自动迭代 CI/CD；前后端独立部署 —— FastAPI 后端 + React/Vite SCADA 风格 SPA 前端，`docker compose up --build` 一键启动。
 
 ## 快速开始
 
 ```bash
-# Docker 一键启动（API + 前端）
+# Docker 一键启动（API + 前端，分别打镜像）
 git clone <repository-url>
 cd mining_risk_agent
-docker-compose up -d
+docker compose up -d --build
 
 # 访问前端演示界面
 open http://localhost:8501
@@ -21,8 +22,9 @@ open http://localhost:8501
 
 | 服务 | 地址 | 说明 |
 |------|------|------|
-| Streamlit 前端 | `http://localhost:8501` | 4标签页演示级 Dashboard |
-| FastAPI 文档 | `http://localhost:8000/docs` | Swagger UI 接口文档 |
+| React SPA 前端 | `http://localhost:8501` | 4 标签页 SCADA Dashboard（Vite 构建 + Nginx 托管） |
+| Swagger UI（同源） | `http://localhost:8501/docs` | 经前端 Nginx 代理到后端 |
+| FastAPI 直连 | `http://localhost:8000/docs` | 直接访问后端 |
 | 健康检查 | `http://localhost:8000/health` | API 服务状态 |
 
 **无需准备数据、无需训练模型、无需配置 API Key**：系统内置 3 组场景化 Mock 数据，后端不可用时自动降级，确保路演演示永不中断。
@@ -65,7 +67,7 @@ open http://localhost:8501
 - **GLM-5 决策智能体 Workflow（Step 6）**：LangGraph 5 节点 DAG（data_ingestion → risk_assessment → memory_recall → decision_generation → result_push），MARCH 校验回环重试（最多 3 次），蒙特卡洛置信度检验，三维风险路由阻断
 - **场景化配置驱动**：支持 chemical（危化品）/ metallurgy（冶金）/ dust（粉尘涉爆）三场景动态切换，场景化 Prompt 模板、知识库子集、校验阈值自动适配
 - **模型自动迭代与 CI/CD 工程化（Step 7）**：监控触发（样本>5000 或 F1<0.85）→ 自动训练流水线 → Git Flow 分支管理 → 回归测试（准确率/精确率/召回率/F1/AUC/SHAP Kendall Tau）→ Drift 分析 → 两级终审（安全负责人 → 技术负责人）→ 24h 预生产试运行 → 灰度发布（0.1→0.5→1.0 阶梯）
-- **演示级前端 Dashboard**：Streamlit 多标签页（4 Tab）演示界面，支持场景切换、风险仪表盘、SHAP 归因、决策卡片、SSE 日志、知识库预览、记忆系统演示、CI/CD 迭代动画；后端不可用时自动 Mock 降级，确保路演永不中断
+- **演示级前端 Dashboard**：独立 React/Vite SPA（4 Tab）+ ECharts 可视化 + Nginx 反向代理，SCADA 工业控制室风格暗色主题；支持场景切换、风险仪表盘、SHAP 归因、决策卡片、POST SSE 节点流、知识库预览、记忆系统演示、CI/CD 迭代动画；后端不可用时自动调用本地 Mock 降级，确保路演永不中断
 
 ## 二、技术栈
 
@@ -79,7 +81,8 @@ open http://localhost:8501
 - seaborn, matplotlib, plotly, plotly-express
 - joblib, tiktoken, pydantic 2.0+, pytest
 - openai, langchain-openai, jinja2
-- Streamlit 1.28+, pandas, numpy
+- 前端 SPA：React 18 + Vite 5 + TypeScript 5 + ECharts 5（独立 Node 构建，Nginx 托管）
+- 数据处理：pandas, numpy
 
 ## 三、环境搭建
 
@@ -101,7 +104,11 @@ venv\Scripts\activate     # Windows
 ### 3. 安装依赖
 
 ```bash
+# 默认只安装后端 API 运行时依赖（Docker 后端镜像同样使用这一层）
 pip install -r requirements.txt
+
+# 如需模型训练、RAG/NLP、旧 Streamlit 前端、测试工具：
+pip install -r requirements-full.txt
 ```
 
 ### 4. 准备数据
@@ -134,13 +141,18 @@ uvicorn mining_risk_agent.api.main:app --host 0.0.0.0 --port 8000 --reload
 
 API 文档地址：`http://localhost:8000/docs`
 
-#### 启动前端
+#### 启动前端（开发模式）
 
 ```bash
-streamlit run mining_risk_agent/frontend/app.py
+cd mining_risk_agent/frontend
+npm install
+npm run dev          # 监听 http://localhost:5173
 ```
 
-前端地址：`http://localhost:8501`
+Vite 已配置开发态代理：`/api/*` 与 `/health` 自动转发到 `http://localhost:8000`。
+可用 `VITE_DEV_API_TARGET=http://其他后端:8000 npm run dev` 改写后端地址。
+
+前端地址：开发态 `http://localhost:5173` ；通过 Docker 部署后为 `http://localhost:8501`。
 
 > 💡 **路演提示**：推荐在 1920×1080 分辨率下全屏演示，界面已针对投影优化，无横向滚动条。详见 [前端演示指南](#十三前端演示指南)。
 
@@ -183,22 +195,29 @@ python -c "from iteration.monitor import ModelMonitor; ModelMonitor().should_ret
 
 报告将输出至 `reports/figures/`，包含 SHAP 蜂群图、力导向图、混淆矩阵、ROC/PR 曲线、训练曲线、元学习器权重图等。
 
-### 方式二：Docker 一键部署
+### 方式二：Docker 一键部署（推荐）
+
+前后端各自独立成镜像，通过 `docker-compose.yml` 一键启动两个容器：
 
 ```bash
-docker-compose up -d
+cd mining_risk_agent
+cp .env.example .env       # 可选：设置 LLM_PROVIDER、LLM API Key、MRA_ADMIN_TOKEN 等
+docker compose up -d --build
 ```
 
-- API 服务：`http://localhost:8000`
-- 前端服务：`http://localhost:8501`
+- 浏览器入口（前端 SPA）：`http://localhost:8501`
+- 直连后端 Swagger：`http://localhost:8000/docs`
+- 经前端反向代理的 Swagger：`http://localhost:8501/docs`
 
-启动后访问 `http://localhost:8501` 即可看到完整多标签页演示界面，包含企业风险预测、知识库与记忆系统、模型迭代 CI/CD、系统配置四大标签页。
+启动后访问 `http://localhost:8501` 即可看到完整 4 标签页演示界面，包含企业风险预测、知识库与记忆系统、模型迭代 CI/CD、系统配置。
 
 **Docker 服务说明：**
-| 服务 | 容器名 | 端口 | 说明 |
-|------|--------|------|------|
-| API | `mining_risk_api` | 8000 | FastAPI 异步服务 |
-| 前端 | `mining_risk_frontend` | 8501 | Streamlit 演示级 Dashboard |
+| 服务 | 镜像 | 容器名 | 端口映射 | 说明 |
+|------|------|--------|----------|------|
+| api | `mining-risk-agent-api` | `mining_risk_api` | `127.0.0.1:8000:8000` | FastAPI + Uvicorn（Python 3.10-slim，仅本机直连） |
+| frontend | `mining-risk-agent-frontend` | `mining_risk_frontend` | `8501:80` | React/Vite SPA（多阶段：node:20-alpine 构建 → nginx:alpine 托管 + 反向代理 `/api`、`/health`、`/docs` 至 `api`） |
+
+> **架构提示**：前端容器内 Nginx 监听 80 端口，把 `/api/*`、`/health`、`/docs`、`/redoc`、`/openapi.json` 反向代理至 `http://api:8000`，并关闭 `proxy_buffering` 以保留 SSE 流式节点输出；浏览器只与前端同源通信，从而避免 CORS 与跨域 Cookie 问题。详见 `mining_risk_agent/frontend/nginx.conf`。
 
 ## 五、接口文档
 
@@ -221,6 +240,8 @@ docker-compose up -d
 | `/api/v1/iteration/status` | GET | 查询当前迭代状态（监控/训练中/审批中/试运行中） |
 | `/api/v1/iteration/approve` | POST | 审批人提交审批结果（security/tech 两级） |
 | `/api/v1/iteration/canary` | POST | 调整灰度流量比例（0.0/0.1/0.5/1.0） |
+
+> 管理接口说明：LLM 配置、知识库写入/快照/回滚、审计查询、模型迭代触发/审批/灰度/回归等敏感接口需要 `X-Admin-Token`，值来自 `MRA_ADMIN_TOKEN`。本地路演如需无鉴权管理操作，可临时设置 `MRA_ALLOW_UNAUTHENTICATED_ADMIN=true`；生产环境建议设置 `MRA_ENABLE_MOCK_FALLBACK=false`，使决策工作流故障返回 503 而不是 Mock 演示数据。
 
 ### 记忆系统接口示例
 
@@ -698,12 +719,12 @@ scenarios:
     risk_threshold: 2.5
 ```
 
-### 9.5 GLM-5 客户端
+### 9.5 LLM 客户端（OpenAI 兼容）
 
 ```python
-from llm.glm5_client import GLM5Client
+from llm.glm5_client import OpenAICompatibleClient
 
-client = GLM5Client()
+client = OpenAICompatibleClient()
 
 # 普通文本生成
 text = await client.generate("请分析以下风险数据...", temperature=0.3, max_tokens=4096)
@@ -716,8 +737,10 @@ json_data = await client.generate_json(
 )
 ```
 
-- 优先读取环境变量 `GLM5_API_KEY`
-- 默认 `model="glm-5"`、`base_url="https://open.bigmodel.cn/api/paas/v4/"`
+- 当前 provider 由 `llm.provider` 或 `LLM_PROVIDER` 决定
+- 可在 `llm.providers` 中新增任意 OpenAI Chat Completions 兼容模型
+- 当前 provider 可用 `LLM_API_KEY` / `LLM_MODEL` / `LLM_BASE_URL` 临时覆盖
+- provider 专属覆盖遵循 `LLM_<PROVIDER>_API_KEY` / `MODEL` / `BASE_URL`
 - 3 次重试 + 指数退避
 
 ## 十、模型自动迭代与 CI/CD 工程化（Step 7）
@@ -919,7 +942,7 @@ mining_risk_agent/
 │   └── workflow.py       # 5节点DAG / 场景化配置 / MARCH回环 / 蒙特卡洛 / 三维风险
 ├── llm/                  # 大模型客户端
 │   ├── __init__.py
-│   └── glm5_client.py    # OpenAI兼容GLM-5 / async生成 / JSON强制输出 / 指数退避重试
+│   └── glm5_client.py    # OpenAI兼容LLM / async生成 / JSON强制输出 / 指数退避重试
 ├── data/                 # 数据模块
 │   ├── loader.py
 │   ├── preprocessor.py   # 特征工程（含7个特殊逻辑Transformer + csv_to_markdown_table）
@@ -956,9 +979,24 @@ mining_risk_agent/
 │   ├── validate_memory.py    # Step 4 长短期混合记忆系统手动验证
 │   ├── train_ner.py      # NER模型训练（支持BIO自动转换）
 │   └── train_model.py
-├── frontend/             # Streamlit 前端
-│   ├── app.py            # 多标签页演示级 Dashboard（4 Tab）
-│   └── demo_data.py      # 3组模拟企业数据 + Mock决策生成器（路演降级保障）
+├── frontend/             # 前端 SPA（React + Vite + ECharts）
+│   ├── Dockerfile        # 多阶段：node 构建 → nginx 托管 + 反向代理
+│   ├── nginx.conf        # /api、/health、/docs 反向代理 + SSE 透传
+│   ├── package.json
+│   ├── vite.config.ts
+│   ├── tsconfig.json
+│   ├── index.html
+│   ├── src/
+│   │   ├── main.tsx
+│   │   ├── App.tsx
+│   │   ├── api/          # API 客户端、TS 类型、POST SSE 解析
+│   │   ├── components/   # SCADA 通用组件（StatusBar/Sidebar/Tabs/ScadaCard 等）
+│   │   ├── pages/        # 4 个 Tab 页面
+│   │   ├── data/         # demoData.ts（与后端 demo_data.py 同步）
+│   │   └── styles/       # SCADA 暗色主题
+│   ├── demo_data.py      # 后端 Mock 降级仍依赖此模块（保留）
+│   ├── __init__.py
+│   └── app_legacy_streamlit.py  # 旧 Streamlit 单文件实现（已停用，仅供参考）
 ├── utils/                # 工具模块
 │   ├── config.py
 │   ├── logger.py
@@ -993,8 +1031,14 @@ mining_risk_agent/
 │   ├── 风险事件归档.md
 │   ├── 处置经验归档.md
 │   └── 系统日志归档.md
-├── config.yaml           # 全局配置（含 llm.glm5 + scenarios 配置节）
-├── requirements.txt
+├── config.yaml           # 全局配置（含 llm.provider / llm.providers + scenarios 配置节）
+├── requirements.txt      # 后端 API 精简运行时依赖（Docker 默认）
+├── requirements-api.txt  # requirements.txt 的别名，便于 CI/文档引用
+├── requirements-ml.txt   # 训练 / SHAP / XGBoost / LightGBM / CatBoost / TensorFlow
+├── requirements-rag.txt  # RAG / NLP / ChromaDB / sentence-transformers / PyTorch
+├── requirements-legacy-frontend.txt # 旧 Streamlit 前端依赖（可选）
+├── requirements-dev.txt  # 测试、爬虫、文档与开发工具
+├── requirements-full.txt # 聚合完整 Python 依赖
 ├── Dockerfile
 ├── docker-compose.yml
 ├── README.md
@@ -1060,13 +1104,16 @@ assets/
 
 当后端服务或 GLM-5 API 不可用时，系统会自动启用 **两级降级**：
 
-1. **后端 Mock**：`api/routers/prediction.py` 中 `_generate_mock_decision()` 根据当前场景返回差异化Mock数据
-2. **前端本地 Mock**：`frontend/demo_data.py` 中 `generate_mock_decision(scenario_id)` 提供与后端格式完全一致的兜底JSON
+1. **后端 Mock**：`api/routers/prediction.py` 中 `_generate_mock_decision()` 根据当前场景返回差异化 Mock 数据（仍走 HTTP 200，并附 `mock=true`）
+2. **前端本地 Mock**：`frontend/src/data/demoData.ts` 中 `generateMockDecision(scenarioId)` 提供与后端格式完全一致的兜底 JSON；后端不可达时由前端 `RiskPredictionPage` 直接调用，路演不中断
 
 **仅启动前端（无后端模式）**：
 ```bash
-# 不需要启动 API 服务，直接运行前端即可
-streamlit run mining_risk_agent/frontend/app.py
+cd mining_risk_agent/frontend
+npm install
+npm run dev
+# 浏览器打开 http://localhost:5173 ；当 /api 调用失败时，
+# 页面会自动调用本地 generateMockDecision() 显示场景化 Mock 决策
 # 所有预测请求将自动使用 frontend/demo_data.py 中的本地 Mock 数据
 ```
 
@@ -1082,15 +1129,17 @@ streamlit run mining_risk_agent/frontend/app.py
 
 | 技术 | 用途 | 关键实现 |
 |------|------|----------|
-| Streamlit 1.28+ | 页面框架 | `st.set_page_config(layout="wide")` + `st.tabs()` 实现4标签页导航 |
-| Plotly | 数据可视化 | `go.Pie` 概率分布环形图、`go.Bar` SHAP Top3 水平条形图 |
-| 自定义 CSS | 投影级样式 | 通过 `st.markdown(..., unsafe_allow_html=True)` 注入：红色风险等级 `#ff4d4f` 背景+脉冲动画、政府干预卡片左侧蓝色边框 `#1890ff`、企业管控卡片左侧橙色边框 `#faad14` |
-| Session State | 状态管理 | `st.session_state` 保存当前场景、决策结果、记忆列表、迭代动画状态 |
-| 本地文件读取 | 知识库兜底 | 后端不可用时，`os.listdir()` 直接扫描 `knowledge_base/` 目录获取 .md 文件列表 |
+| React 18 + TypeScript 5 | 页面框架 | `App.tsx` 中以 `useState` 维护 scenario / health / iteration 全局状态，`Tabs` 组件控制 4 个 Page |
+| Vite 5 | 构建与开发态代理 | `vite.config.ts` 中 `server.proxy` 把 `/api`、`/health` 转发到 `http://localhost:8000`，热更新 < 1s |
+| ECharts 5 | 数据可视化 | `ProbabilityChart` 环形概率分布、`ShapChart` SHAP Top5 水平条形图，全部走 `echarts-for-react` |
+| 自定义 SCADA CSS | 投影级样式 | `src/styles/scada.css` 内置 SCADA 暗色主题、`risk-red-pulse` 脉冲动画、`glow-red/orange/yellow/blue` 风险光晕、Timeline / Validation / Memory 卡片样式 |
+| `fetch + ReadableStream` | POST SSE 流式节点 | `api/client.ts:streamDecision` 自行解析 `data:` 行，弥补 `EventSource` 不支持 POST 的限制 |
+| 本地 Mock 兜底 | 后端离线降级 | `src/data/demoData.ts` 镜像后端 `frontend/demo_data.py` 的三场景 Mock 决策；`/api/v1/agent/decision` 失败时由前端直接渲染本地 Mock |
+| Nginx 反向代理 | 同源避免跨域 | 前端容器内 Nginx 把 `/api`、`/health`、`/docs` 转发到 `api:8000`，并关闭 `proxy_buffering` 以保留 SSE 流 |
 
 ### 13.6 演示数据字段说明
 
-`frontend/demo_data.py` 中预置的 3 组高危企业数据，每组均包含以下核心字段：
+`frontend/demo_data.py`（后端 Mock 路径）与 `frontend/src/data/demoData.ts`（前端 Mock 路径）中预置的 3 组高危企业数据，字段保持一致；每组均包含以下核心字段：
 
 | 字段类别 | 示例字段 | 说明 |
 |----------|----------|------|
@@ -1157,7 +1206,7 @@ pytest tests/ -v --cov=mining_risk_agent --cov-report=html
 ## 十六、常见问题
 
 **Q1：路演现场没有网络/API Key 怎么办？**
-> 系统支持 **零配置运行**。直接执行 `streamlit run mining_risk_agent/frontend/app.py`，无需启动后端，无需 GLM-5 API Key，所有预测将自动返回 `frontend/demo_data.py` 中预置的完整 Mock 决策 JSON。
+> 系统支持 **零配置运行**。`docker compose up -d --build` 启动后即使后端 GLM-5 不可用，前端也会自动调用本地 `src/data/demoData.ts` 的 Mock 决策 JSON。仅启动前端开发态：`cd mining_risk_agent/frontend && npm run dev`，浏览器打开 <http://localhost:5173> 即可。
 
 **Q2：如何切换演示场景？**
 > 左侧边栏「场景配置」下拉框选择 chemical / metallurgy / dust，点击「执行预测」即可看到不同场景的差异化决策结果（阈值、风险等级、处置建议均不同）。

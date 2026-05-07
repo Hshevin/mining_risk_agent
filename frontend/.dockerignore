@@ -1,0 +1,12 @@
+node_modules
+dist
+dist-tsbuild-node
+*.tsbuildinfo
+.git
+*.py
+__pycache__
+.vscode
+.devcontainer
+.DS_Store
+.env
+.env.local

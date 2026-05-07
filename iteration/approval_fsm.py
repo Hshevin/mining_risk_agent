@@ -6,6 +6,7 @@ PENDING_REVIEW -> SECURITY_APPROVED -> TECH_APPROVED -> STAGING -> PRODUCTION ->
 import json
 import sqlite3
 import time
+import os
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
@@ -365,6 +366,3 @@ class ApprovalFSM:
             )
         except Exception as e:
             logger.warning(f"AgentFS 日志写入失败: {e}")
-
-
-import os

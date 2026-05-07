@@ -187,10 +187,23 @@ class AgentFS:
         old = cursor.fetchone()
         created_at = old[0] if old else now
 
-        cursor.execute(
-            "INSERT OR REPLACE INTO files (path, content, checksum) VALUES (?, ?, ?)",
-            (path, content, checksum),
-        )
+        cursor.execute("PRAGMA table_info(files)")
+        file_columns = {row[1] for row in cursor.fetchall()}
+        if {"created_at", "updated_at"}.issubset(file_columns):
+            # 兼容早期 files 表把时间戳直接放在 files 中且设为 NOT NULL 的版本。
+            cursor.execute(
+                """
+                INSERT OR REPLACE INTO files
+                (path, content, checksum, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (path, content, checksum, created_at, now),
+            )
+        else:
+            cursor.execute(
+                "INSERT OR REPLACE INTO files (path, content, checksum) VALUES (?, ?, ?)",
+                (path, content, checksum),
+            )
         cursor.execute(
             """
             INSERT OR REPLACE INTO metadata
@@ -362,11 +375,15 @@ class AgentFS:
         has_changes = bool(repo.index.diff("HEAD")) if has_head else True
 
         if has_changes:
-            commit = repo.index.commit(f"{commit_message} [agent:{agent_id or 'system'}]")
-            commit_id = commit.hexsha
-            logger.info(f"Git 提交完成，Commit ID: {commit_id}")
-            self._log_operation("SNAPSHOT", agent_id=agent_id, details=f"commit={commit_id}")
-            return commit_id
+            try:
+                commit = repo.index.commit(f"{commit_message} [agent:{agent_id or 'system'}]")
+                commit_id = commit.hexsha
+                logger.info(f"Git 提交完成，Commit ID: {commit_id}")
+                self._log_operation("SNAPSHOT", agent_id=agent_id, details=f"commit={commit_id}")
+                return commit_id
+            except Exception as e:
+                logger.warning(f"Git 提交失败（可能缺少 user.email/user.name 配置）: {e}")
+                return ""
         else:
             commit_id = repo.head.commit.hexsha
             logger.info(f"无变更，当前 Commit ID: {commit_id}")

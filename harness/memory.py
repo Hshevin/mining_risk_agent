@@ -492,6 +492,15 @@ class LongTermMemory:
             self._reranker = Reranker()
         return self._reranker
 
+    def is_rag_enabled(self) -> bool:
+        """长期记忆 RAG 开关，默认开启；部署配置可显式关闭以隔离 native 依赖。"""
+        try:
+            config = get_config()
+            return bool(config.harness.memory.long_term.rag.get("enabled", True))
+        except Exception as e:
+            logger.warning(f"读取 RAG 开关失败，默认关闭长期记忆召回: {e}")
+            return False
+
     async def summarize_and_archive(
         self,
         p1_memories: List[Dict[str, Any]],
@@ -557,6 +566,9 @@ class LongTermMemory:
         """
         if not query or not query.strip():
             return []
+        if not self.is_rag_enabled():
+            logger.info("长期记忆 RAG 已关闭，跳过向量召回")
+            return []
 
         def _do_recall():
             # 构建 SelfQuery 过滤器
@@ -589,7 +601,13 @@ class LongTermMemory:
             ranked = reranker.rerank(query, passages, top_k=top_k)
             return ranked
 
-        return await _to_thread(_do_recall)
+        try:
+            return await _to_thread(_do_recall)
+        except ImportError:
+            raise
+        except Exception as e:
+            logger.warning(f"长期记忆 RAG 召回失败，降级为空结果: {e}")
+            return []
 
     def trace_event(self, commit_id: str) -> Dict[str, Any]:
         """事故溯源：通过 Commit ID 回滚到历史状态"""
@@ -637,6 +655,10 @@ class HybridMemoryManager:
     ) -> List[Dict[str, Any]]:
         """新版长期记忆召回（异步，含 SelfQuery + BGE-Reranker）"""
         return await self.long_term.recall(query, risk_level=risk_level, top_k=top_k)
+
+    def is_long_term_rag_enabled(self) -> bool:
+        """返回长期记忆 RAG 是否启用，供工作流输出更准确的节点状态。"""
+        return self.long_term.is_rag_enabled()
 
     def get_combined_context(self, query: str, max_tokens: Optional[int] = None) -> str:
         """获取组合上下文：短期记忆 + 长期记忆查询提示"""

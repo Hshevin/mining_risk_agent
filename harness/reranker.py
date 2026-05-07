@@ -8,9 +8,14 @@
     ranked = reranker.rerank("高炉煤气泄漏", passages, top_k=5)
 """
 
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
-from sentence_transformers import CrossEncoder
+try:
+    from sentence_transformers import CrossEncoder
+    _CROSS_ENCODER_IMPORT_ERROR = None
+except Exception as e:
+    CrossEncoder = None
+    _CROSS_ENCODER_IMPORT_ERROR = e
 
 from utils.config import get_config
 from utils.logger import get_logger
@@ -34,9 +39,16 @@ class Reranker:
             "reranker_model", "BAAI/bge-reranker-large"
         )
         self.device = device
-        self._model: Optional[CrossEncoder] = None
+        self._model: Optional[Any] = None
 
-    def _load_model(self) -> CrossEncoder:
+    def _load_model(self) -> Any:
+        if CrossEncoder is None:
+            detail = f" 原始错误: {_CROSS_ENCODER_IMPORT_ERROR}" if _CROSS_ENCODER_IMPORT_ERROR else ""
+            raise ImportError(
+                "Reranker 需要可选依赖 sentence-transformers。"
+                "请安装 `pip install -r requirements-rag.txt` 或 `pip install -r requirements-full.txt`。"
+                f"{detail}"
+            )
         if self._model is None:
             logger.info(f"加载重排序模型: {self.model_name}")
             self._model = CrossEncoder(self.model_name, device=self.device)

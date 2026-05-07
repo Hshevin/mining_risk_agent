@@ -189,24 +189,28 @@ class TestFeatureEngineeringPipeline:
 
     def test_pipeline(self):
         df = pd.DataFrame({
-            "主键ID": ["A", "B", "C"],
-            "是否发生事故": ["是", "否", "否"],
-            "企业职工总人数": [100, 200, np.nan],
-            "管理类别": [1001, 1002, 1003],
-            "具体风险描述": ["正常", "", "瓦斯泄漏"],
-            "国民经济大类": ["采矿业", "制造业", "化工"],
-            "干式除尘": [10, 0, 5],
-            "湿式除尘": [5, 10, 5],
-            "是否有限空间": [0, 1, 0],
-            "密闭空间作业": [0, 0, 1],
-            "是否使用危化品": [0, 0, 1],
-            "检查时间": pd.to_datetime(["2024-01-01", "2023-06-01", "2022-03-01"]),
-            "隐患数量": [10, 20, 30],
-            "经度": [0.5, 2.0, 0.3],
-            "纬度": [0.5, 2.0, 0.3],
-            "企业ID": ["E1", "E1", "E2"],
-            "立案数": [1, 0, 2],
-            "数据来源": ["企业自报", "执法", "日常检查"],
+            "above_designated": [1, 0, 1],
+            "staff_num": [100, 200, np.nan],
+            "indus_type_large": ["采矿业", "制造业", "化工"],
+            "dust_ganshi_num": [10, 0, 5],
+            "dust_shishi_num": [5, 10, 5],
+            "is_finite_space": [0, 1, 0],
+            "confined_spaces_enterprise": [0, 0, 1],
+            "dangerous_chemical_enterprise": [0, 0, 1],
+            "is_ammonia_refrigerating": [0, 1, 0],
+            "report_time": pd.to_datetime(["2024-01-01", "2023-06-01", None]),
+            "trouble_total_count": [10, 20, 30],
+            "risk_total_count": [5, 3, 1],
+            "check_total_count": [20, 10, 5],
+            "dir_longitude": [120.5, 121.0, 120.3],
+            "dir_latitude": [31.1, 31.2, 31.0],
+            "enterprise_id": ["E1", "E1", "E2"],
+            "trouble_level_2_count": [1, 0, 2],
+            "risk_with_accident_count": [0, 1, 0],
+            "writ_total_count": [3, 2, 1],
+            "writ_from_case_count": [1, 0, 2],
+            "writ_from_check_count": [2, 2, 0],
+            "cf_source": ["企业自报", "执法", "日常检查"],
         })
         pipeline = FeatureEngineeringPipeline()
         result = pipeline.fit_transform(df)
@@ -224,24 +228,21 @@ class TestFeatureEngineeringPipeline:
         assert result["confined_space_flag"].tolist() == [0, 1, 1]
 
         assert "hazardous_chemical_flag" in result.columns
-        assert result["hazardous_chemical_flag"].tolist() == [0, 0, 1]
+        assert result["hazardous_chemical_flag"].tolist() == [0, 1, 1]
 
-        assert "隐患数量_decay_weighted" in result.columns
+        assert "trouble_total_count_decay_weighted" in result.columns
 
         assert "in_chemical_park" in result.columns
         # 默认无围栏配置时输出0
 
         assert "enterprise_hazard_score" in result.columns
-        assert result.loc[0, "enterprise_hazard_score"] == 10.0
+        assert result.loc[0, "enterprise_hazard_score"] == 11.0
 
         assert "data_credibility" in result.columns
         assert result.loc[1, "data_credibility"] == 4.0
 
-        assert "是否发生事故" in result.columns
-        assert result["是否发生事故"].tolist() == [1, 0, 0]
-
-        assert "具体风险描述_completeness" in result.columns
-        assert result.loc[1, "具体风险描述_completeness"] == 1.0  # 空值
+        assert "above_designated" in result.columns
+        assert result["above_designated"].tolist() == [1, 0, 1]
 
     def test_save_load(self):
         df = pd.DataFrame({

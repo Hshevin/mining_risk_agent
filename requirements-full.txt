@@ -1,0 +1,8 @@
+# 完整 Python 依赖集合
+# 本地研发、模型训练、RAG、旧 Streamlit 前端和测试环境使用。
+
+-r requirements.txt
+-r requirements-ml.txt
+-r requirements-rag.txt
+-r requirements-legacy-frontend.txt
+-r requirements-dev.txt
