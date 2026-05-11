@@ -15,7 +15,7 @@ htmlcov/
 logs/*.log
 data/*.db
 data/chroma_db/
-
+./data
 # Training intermediates
 catboost_info/
 

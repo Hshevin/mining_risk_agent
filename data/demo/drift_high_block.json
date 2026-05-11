@@ -1,0 +1,42 @@
+{
+  "metadata": {
+    "batch_id": "drift_high_block",
+    "sample_count": 4200,
+    "risk_sample_count": 1600,
+    "recent_f1": 0.893,
+    "description": "输入分布漂移达到高风险，Drift 门禁阻断发布。",
+    "scenario": "DRIFT_HIGH_BLOCK",
+    "tags": ["drift", "blocked"]
+  },
+  "gates": {
+    "regression": {
+      "status": "PASS",
+      "baseline_f1": 0.881,
+      "candidate_f1": 0.889
+    },
+    "drift": {
+      "risk_level": "HIGH",
+      "psi": 0.42,
+      "threshold": 0.25,
+      "top_shifted_features": [
+        "risk_total_count",
+        "trouble_level_2_count",
+        "industry_category"
+      ]
+    }
+  },
+  "records": [
+    {
+      "enterprise_id": "DEMO-DRIFT-001",
+      "risk_level": "orange",
+      "risk_items": 10,
+      "unrectified_troubles": 2
+    },
+    {
+      "enterprise_id": "DEMO-DRIFT-002",
+      "risk_level": "yellow",
+      "risk_items": 6,
+      "unrectified_troubles": 1
+    }
+  ]
+}

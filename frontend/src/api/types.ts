@@ -167,3 +167,95 @@ export interface AuditLogEntry {
   risk_level?: string;
   validation_status?: string;
 }
+
+export interface ShortTermMemory {
+  id: string;
+  text: string;
+  priority: "P0" | "P1" | "P2" | "P3";
+  type: "short";
+  time: string;
+  timestamp: number;
+  source?: string;
+  tags?: string[];
+  enterprise_id?: string;
+  category?: "inference" | "warning" | "experience" | "context";
+  compressed?: boolean;
+  context_window_active?: boolean;
+}
+
+export interface LongTermMemory {
+  id: string;
+  text: string;
+  priority: "P0" | "P1" | "P2" | "P3";
+  type: "long";
+  time: string;
+  timestamp: number;
+  source?: string;
+  tags?: string[];
+  enterprise_id?: string;
+  category?: "regulation" | "accident_case" | "experience" | "knowledge" | "enterprise_data";
+  migrated_from_short?: boolean;
+  migrated_at?: number;
+  data_source?: string;
+  verified?: boolean;
+}
+
+export type MemoryItem = ShortTermMemory | LongTermMemory;
+
+export interface WarningLog {
+  id: string;
+  timestamp: number;
+  time_str: string;
+  enterprise_id: string;
+  enterprise_name: string;
+  risk_level: string;
+  risk_score: number;
+  trigger_condition: string;
+  root_cause: string;
+  actions_taken: string[];
+  status: "active" | "resolved" | "expired";
+  resolution?: string;
+  experience_recorded?: boolean;
+}
+
+export interface IterationRecord {
+  id: string;
+  version: string;
+  date: string;
+  status: "draft" | "testing" | "pending_approval" | "approved" | "rejected" | "canary" | "production";
+  f1: number;
+  samples: number;
+  description: string;
+  improvements: string[];
+  technical_details: string;
+  expected_effect: string;
+  approver?: string;
+  approval_comment?: string;
+  approved_at?: number;
+  created_at: number;
+}
+
+export interface EnterpriseRiskScore {
+  enterprise_id: string;
+  enterprise_name: string;
+  risk_score: number;
+  risk_level: string;
+  scenario: string;
+  assessment_time: string;
+  key_factors: { name: string; value: number; color: string }[];
+  inference_stored: boolean;
+}
+
+export interface ModelEvaluationReport {
+  id: string;
+  generated_at: string;
+  total_assessments: number;
+  accuracy: number;
+  precision: number;
+  recall: number;
+  f1_score: number;
+  false_positive_rate: number;
+  false_negative_rate: number;
+  level_distribution: Record<string, number>;
+  improvement_suggestions: string[];
+}

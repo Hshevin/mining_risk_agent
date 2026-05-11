@@ -9,6 +9,7 @@ import {
 import ScadaCard from "../components/ScadaCard";
 import { ProbabilityChart, ShapChart } from "../components/charts";
 import JsonView from "../components/JsonView";
+import ReactECharts from "echarts-for-react";
 
 interface Props {
   scenario: ScenarioId;
@@ -329,6 +330,8 @@ function DecisionView({ decision, streamLog }: DecisionProps) {
 
       <KpiCards decision={decision} />
 
+      <RiskScorePanel decision={decision} />
+
       <div className="row cols-2" style={{ marginTop: 16 }}>
         {decision.probability_distribution && (
           <ProbabilityChart
@@ -591,6 +594,235 @@ function TimelineLogs({ nodes }: { nodes: NodeStatus[] }) {
           </div>
         );
       })}
+    </div>
+  );
+}
+
+const RISK_LEVELS_CONFIG = [
+  { key: "红", label: "红色预警", color: "#ef4444", bg: "rgba(239,68,68,0.12)", range: "≥ 0.80", desc: "极高风险，需立即处置" },
+  { key: "橙", label: "橙色预警", color: "#f97316", bg: "rgba(249,115,22,0.12)", range: "0.60-0.79", desc: "高风险，需限期整改" },
+  { key: "黄", label: "黄色预警", color: "#eab308", bg: "rgba(234,179,8,0.12)", range: "0.40-0.59", desc: "中等风险，需加强监控" },
+  { key: "蓝", label: "蓝色预警", color: "#3b82f6", bg: "rgba(59,130,246,0.12)", range: "0.20-0.39", desc: "低风险，常规巡检" },
+];
+
+function RiskScorePanel({ decision }: { decision: DecisionResponse }) {
+  const tdr = decision.three_d_risk;
+  const mc = decision.monte_carlo_result;
+  const level = decision.predicted_level || "未知";
+
+  const topProb = Object.entries(decision.probability_distribution || {})
+    .sort(([, a], [, b]) => b - a)[0];
+  const riskScore = topProb ? topProb[1] : 0;
+
+  const levelColor = LEVEL_HEX[level] ?? "#64748b";
+  const levelInfo = RISK_LEVELS_CONFIG.find((l) => l.key === level);
+
+  const severity = tdr?.severity === "极高" ? 0.9 : tdr?.severity === "高" ? 0.7 : tdr?.severity === "中" ? 0.5 : tdr?.severity === "低" ? 0.3 : 0;
+  const relevance = tdr?.relevance === "极高" ? 0.9 : tdr?.relevance === "高" ? 0.7 : tdr?.relevance === "中" ? 0.5 : tdr?.relevance === "低" ? 0.3 : 0;
+  const irreversibility = tdr?.irreversibility === "极高" ? 0.9 : tdr?.irreversibility === "高" ? 0.7 : tdr?.irreversibility === "中" ? 0.5 : tdr?.irreversibility === "低" ? 0.3 : 0;
+
+  const gaugeOption = useMemo(() => ({
+    backgroundColor: "transparent",
+    series: [{
+      type: "gauge" as const,
+      startAngle: 220,
+      endAngle: -40,
+      min: 0,
+      max: 1,
+      radius: "90%",
+      progress: {
+        show: true,
+        width: 14,
+        itemStyle: {
+          color: {
+            type: "linear" as const,
+            x: 0, y: 0, x2: 1, y2: 0,
+            colorStops: [
+              { offset: 0, color: "#10b981" },
+              { offset: 0.4, color: "#eab308" },
+              { offset: 0.7, color: "#f97316" },
+              { offset: 1, color: "#ef4444" },
+            ],
+          },
+        },
+      },
+      axisLine: { lineStyle: { width: 14, color: [[1, "#1e293b"]] } },
+      axisTick: { show: false },
+      splitLine: { show: false },
+      axisLabel: { show: false },
+      pointer: { show: false },
+      anchor: { show: false },
+      title: { show: false },
+      detail: {
+        valueAnimation: true,
+        fontSize: 32,
+        fontWeight: 800,
+        fontFamily: "JetBrains Mono, monospace",
+        color: levelColor,
+        offsetCenter: [0, "10%"],
+        formatter: (v: number) => (v > 0 ? v.toFixed(2) : "—"),
+      },
+      data: [{ value: riskScore }],
+    }],
+  }), [riskScore, levelColor]);
+
+  const radarOption = useMemo(() => ({
+    backgroundColor: "transparent",
+    radar: {
+      indicator: [
+        { name: "严重性", max: 1 },
+        { name: "相关性", max: 1 },
+        { name: "不可逆性", max: 1 },
+      ],
+      shape: "polygon" as const,
+      splitNumber: 4,
+      axisName: { color: "#94a3b8", fontSize: 11 },
+      splitLine: { lineStyle: { color: "#1e293b" } },
+      splitArea: { areaStyle: { color: ["transparent"] } },
+      axisLine: { lineStyle: { color: "#1e293b" } },
+    },
+    series: [{
+      type: "radar" as const,
+      data: [{
+        value: [severity, relevance, irreversibility],
+        name: "三维风险",
+        areaStyle: {
+          color: {
+            type: "radial" as const,
+            x: 0.5, y: 0.5, r: 0.5,
+            colorStops: [
+              { offset: 0, color: "rgba(239,68,68,0.3)" },
+              { offset: 1, color: "rgba(59,130,246,0.1)" },
+            ],
+          },
+        },
+        lineStyle: { color: "#f97316", width: 2 },
+        itemStyle: { color: "#f97316" },
+      }],
+    }],
+  }), [severity, relevance, irreversibility]);
+
+  const shapFactors = (decision.shap_contributions || []).map((s) => ({
+    name: s.feature,
+    value: Math.abs(s.contribution),
+    color: s.contribution >= 0 ? "#ef4444" : "#10b981",
+  }));
+
+  return (
+    <div style={{ marginTop: 16 }}>
+      <div className="subtitle">🎯 风险评分与等级分析</div>
+      <div className="row cols-3">
+        <div className="scada-card">
+          <div className="risk-report-title" style={{ marginBottom: 12 }}>
+            综合风险评分
+          </div>
+          <div className="risk-gauge-container" style={{ padding: "10px 0" }}>
+            <div style={{ width: 200, height: 160 }}>
+              <ReactECharts option={gaugeOption} style={{ height: "100%" }} />
+            </div>
+            {levelInfo && (
+              <div
+                className="risk-level-badge"
+                style={{
+                  background: levelInfo.bg,
+                  color: levelInfo.color,
+                  border: `1px solid ${levelInfo.color}44`,
+                }}
+              >
+                <span style={{ width: 10, height: 10, borderRadius: "50%", background: levelInfo.color, display: "inline-block" }} />
+                {levelInfo.label}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="scada-card">
+          <div className="risk-report-title" style={{ marginBottom: 12 }}>
+            三维风险雷达
+          </div>
+          <ReactECharts option={radarOption} style={{ height: 200 }} />
+          {tdr?.total_score !== undefined && (
+            <div style={{ textAlign: "center", marginTop: 4 }}>
+              <span className="tag tag-amber">
+                三维评分: {tdr.total_score.toFixed(1)}
+              </span>
+              {tdr.blocked && (
+                <span className="tag tag-red" style={{ marginLeft: 6 }}>
+                  已拦截
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="scada-card">
+          <div className="risk-report-title" style={{ marginBottom: 12 }}>
+            风险因子贡献度
+          </div>
+          {shapFactors.slice(0, 5).map((factor, idx) => (
+            <div key={idx} className="risk-factor-item">
+              <div className="risk-factor-name">{factor.name}</div>
+              <div className="risk-factor-bar">
+                <div
+                  className="risk-factor-fill"
+                  style={{
+                    width: `${Math.min(factor.value * 200, 100)}%`,
+                    background: factor.color,
+                  }}
+                />
+              </div>
+              <div className="risk-factor-value" style={{ color: factor.color }}>
+                {factor.value.toFixed(2)}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="risk-report-section" style={{ marginTop: 14 }}>
+        <div className="risk-report-header">
+          <div className="risk-report-title">📋 风险分析报告</div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <span className={`tag tag-${level === "红" ? "red" : level === "橙" ? "orange" : level === "黄" ? "amber" : "blue"}`}>
+              等级: {levelInfo?.label ?? level}
+            </span>
+            {mc && (
+              <span className={`tag ${mc.passed ? "tag-emerald" : "tag-red"}`}>
+                蒙特卡洛: {mc.passed ? "通过" : "未通过"} ({mc.confidence?.toFixed(2)})
+              </span>
+            )}
+          </div>
+        </div>
+        <div style={{ fontSize: 13, lineHeight: 1.8, color: "#d1d5db" }}>
+          <p style={{ margin: "0 0 6px" }}>
+            企业 <b style={{ color: "#f1f5f9" }}>{decision.enterprise_id}</b> 风险评估完成，
+            预测等级为 <b style={{ color: levelColor }}>{level}级</b>，
+            综合评分 <b style={{ color: levelColor }}>{riskScore.toFixed(2)}</b>。
+          </p>
+          {decision.risk_level_and_attribution?.root_cause && (
+            <p style={{ margin: "0 0 6px" }}>
+              根因分析：<b style={{ color: "#fca5a5" }}>{decision.risk_level_and_attribution.root_cause}</b>
+            </p>
+          )}
+          {tdr && (
+            <p style={{ margin: "0 0 6px" }}>
+              三维风险评估：严重性 <b>{tdr.severity}</b>、相关性 <b>{tdr.relevance}</b>、
+              不可逆性 <b>{tdr.irreversibility}</b>，综合评分 <b>{tdr.total_score?.toFixed(1)}</b>
+              {tdr.blocked ? " — 触发拦截" : " — 未触发拦截"}。
+            </p>
+          )}
+          {level === "红" && (
+            <p style={{ margin: 0, color: "#fca5a5" }}>
+              ⚠️ 建议立即启动应急响应，执行人员撤离与设备断电操作，同步通知属地应急管理部门。
+            </p>
+          )}
+          {level === "橙" && (
+            <p style={{ margin: 0, color: "#fdba74" }}>
+              ⚡ 建议限期整改，72小时内组织专项检查，加强重点设备监控频次。
+            </p>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

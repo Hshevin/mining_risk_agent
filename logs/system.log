@@ -5803,3 +5803,529 @@ If this is a private repository, make sure to pass a token having permission to 
 2026-05-03 12:58:24,100 - __main__ - INFO -   类似事故处理案例.md: 3670 bytes
 2026-05-03 12:58:24,101 - __main__ - INFO -   预警历史经验与短期记忆摘要.md: 1258 bytes
 2026-05-03 13:02:02,592 - api.main - INFO - 应用关闭
+2026-05-07 21:44:36,809 - api.main - INFO - mining_risk_agent v1.0.0 启动中...
+2026-05-10 12:30:32,861 - api.main - INFO - mining_risk_agent v1.0.0 启动中...
+2026-05-10 13:00:20,598 - iteration.monitor - INFO - 监控表已初始化
+2026-05-10 13:00:24,224 - data.preprocessor - INFO - Pipeline 已从 models/preprocessing_pipeline.pkl 加载
+2026-05-10 13:00:24,225 - agent.workflow - INFO - Workflow 输入字段标准化完成: mapped=['企业名称->enterprise_name', '企业职工总人数->staff_num', '专职安全生产管理人员数->fulltime_safety_num', '兼职安全生产管理人员数->parttime_safety_num', '上一年经营收入->last_year_income', '固定资产->fixed_assets', '安全生产标准化建设情况->safety_build', '行业监管大类->supervision_large', '国民经济大类->indus_type_large', '是否发生事故->risk_accident_flag', '是否发现问题隐患 0-否 1-是->has_risk_item'] defaulted_count=49
+2026-05-10 13:00:24,295 - model.stacking - INFO - 基学习器 multinomial_lr (logistic_regression) 已初始化
+2026-05-10 13:00:24,296 - model.stacking - INFO - 基学习器 xgboost (xgboost) 已初始化
+2026-05-10 13:00:24,297 - model.stacking - INFO - 基学习器 lightgbm (lightgbm) 已初始化
+2026-05-10 13:00:24,300 - model.stacking - INFO - 基学习器 catboost (catboost) 已初始化
+2026-05-10 13:00:24,301 - model.stacking - INFO - 基学习器 random_forest (random_forest) 已初始化
+2026-05-10 13:00:24,301 - model.stacking - INFO - 元学习器已初始化
+2026-05-10 13:00:24,418 - agent.workflow - ERROR - 风险评估失败: <class 'keras.src.models.functional.Functional'> could not be deserialized properly. Please ensure that components that are Python object instances (layers, models, etc.) returned by `get_config()` are explicitly deserialized in the model's `from_config()` method.
+
+config={'module': 'keras.src.models.functional', 'class_name': 'Functional', 'config': {}, 'registered_name': 'Functional', 'build_config': {'input_shape': None}, 'compile_config': {'optimizer': {'module': 'keras.optimizers', 'class_name': 'Adam', 'config': {'name': 'adam', 'learning_rate': 0.0010000000474974513, 'weight_decay': None, 'clipnorm': None, 'global_clipnorm': None, 'clipvalue': None, 'use_ema': False, 'ema_momentum': 0.99, 'ema_overwrite_frequency': None, 'loss_scale_factor': None, 'gradient_accumulation_steps': None, 'beta_1': 0.9, 'beta_2': 0.999, 'epsilon': 1e-07, 'amsgrad': False}, 'registered_name': None}, 'loss': 'sparse_categorical_crossentropy', 'loss_weights': None, 'metrics': ['accuracy'], 'weighted_metrics': None, 'run_eagerly': False, 'steps_per_execution': 1, 'jit_compile': False}}.
+
+Exception encountered: <class 'keras.src.layers.core.dense.Dense'> could not be deserialized properly. Please ensure that components that are Python object instances (layers, models, etc.) returned by `get_config()` are explicitly deserialized in the model's `from_config()` method.
+
+config={'module': 'keras.layers', 'class_name': 'Dense', 'config': {'name': 'dense', 'trainable': True, 'dtype': {'module': 'keras', 'class_name': 'DTypePolicy', 'config': {'name': 'float32'}, 'registered_name': None}, 'units': 128, 'activation': 'relu', 'use_bias': True, 'kernel_initializer': {'module': 'keras.initializers', 'class_name': 'GlorotUniform', 'config': {'seed': None}, 'registered_name': None}, 'bias_initializer': {'module': 'keras.initializers', 'class_name': 'Zeros', 'config': {}, 'registered_name': None}, 'kernel_regularizer': None, 'bias_regularizer': None, 'kernel_constraint': None, 'bias_constraint': None, 'quantization_config': None}, 'registered_name': None, 'build_config': {'input_shape': [None, 19]}, 'name': 'dense', 'inbound_nodes': [{'args': [{'class_name': '__keras_tensor__', 'config': {'shape': [None, 19], 'dtype': 'float32', 'keras_history': ['input_layer', 0, 0]}}], 'kwargs': {}}]}.
+
+Exception encountered: Error when deserializing class 'Dense' using config={'name': 'dense', 'trainable': True, 'dtype': 'float32', 'units': 128, 'activation': 'relu', 'use_bias': True, 'kernel_initializer': {'module': 'keras.initializers', 'class_name': 'GlorotUniform', 'config': {'seed': None}, 'registered_name': None}, 'bias_initializer': {'module': 'keras.initializers', 'class_name': 'Zeros', 'config': {}, 'registered_name': None}, 'kernel_regularizer': None, 'bias_regularizer': None, 'kernel_constraint': None, 'bias_constraint': None, 'quantization_config': None}.
+
+Exception encountered: Unrecognized keyword arguments passed to Dense: {'quantization_config': None}
+2026-05-10 13:00:24,430 - agent.workflow - INFO - Workflow 输入字段标准化完成: mapped=['企业名称->enterprise_name', '企业职工总人数->staff_num', '专职安全生产管理人员数->fulltime_safety_num', '兼职安全生产管理人员数->parttime_safety_num', '上一年经营收入->last_year_income', '固定资产->fixed_assets', '安全生产标准化建设情况->safety_build', '行业监管大类->supervision_large', '国民经济大类->indus_type_large', '是否发生事故->risk_accident_flag', '是否发现问题隐患 0-否 1-是->has_risk_item'] defaulted_count=49
+2026-05-10 13:00:24,462 - agent.workflow - ERROR - 风险评估失败: 模型推理失败: This LogisticRegression instance is not fitted yet. Call 'fit' with appropriate arguments before using this estimator.
+2026-05-10 13:00:24,464 - api.routers.prediction - WARNING - Workflow 返回结果不完整，降级至 Mock: 模型推理失败: This LogisticRegression instance is not fitted yet. Call 'fit' with appropriate arguments before using this estimator.
+2026-05-10 13:00:26,709 - harness.agentfs - INFO - AgentFS 数据库已初始化
+2026-05-10 13:00:26,948 - harness.agentfs - INFO - Git 仓库已初始化: data/agentfs_git
+2026-05-10 13:00:27,000 - harness.agentfs - INFO - AgentFS 数据库已初始化
+2026-05-10 13:00:28,289 - iteration.monitor - INFO - 监控表已初始化
+2026-05-10 13:00:31,303 - agent.workflow - INFO - Workflow 输入字段标准化完成: mapped=['企业名称->enterprise_name', '企业职工总人数->staff_num', '专职安全生产管理人员数->fulltime_safety_num', '兼职安全生产管理人员数->parttime_safety_num', '上一年经营收入->last_year_income', '固定资产->fixed_assets', '安全生产标准化建设情况->safety_build', '行业监管大类->supervision_large', '国民经济大类->indus_type_large', '是否发生事故->risk_accident_flag', '是否发现问题隐患 0-否 1-是->has_risk_item'] defaulted_count=49
+2026-05-10 13:00:31,342 - agent.workflow - ERROR - 风险评估失败: 模型推理失败: This LogisticRegression instance is not fitted yet. Call 'fit' with appropriate arguments before using this estimator.
+2026-05-10 13:00:31,349 - agent.workflow - INFO - Workflow 输入字段标准化完成: mapped=['企业名称->enterprise_name', '企业职工总人数->staff_num', '专职安全生产管理人员数->fulltime_safety_num', '兼职安全生产管理人员数->parttime_safety_num', '上一年经营收入->last_year_income', '固定资产->fixed_assets', '安全生产标准化建设情况->safety_build', '行业监管大类->supervision_large', '国民经济大类->indus_type_large', '是否发生事故->risk_accident_flag', '是否发现问题隐患 0-否 1-是->has_risk_item'] defaulted_count=49
+2026-05-10 13:00:31,383 - agent.workflow - ERROR - 风险评估失败: 模型推理失败: This LogisticRegression instance is not fitted yet. Call 'fit' with appropriate arguments before using this estimator.
+2026-05-10 13:00:31,386 - api.routers.prediction - WARNING - Workflow 返回结果不完整，降级至 Mock: 模型推理失败: This LogisticRegression instance is not fitted yet. Call 'fit' with appropriate arguments before using this estimator.
+2026-05-10 13:01:12,289 - agent.workflow - INFO - Workflow 输入字段标准化完成: mapped=['企业名称->enterprise_name', '企业职工总人数->staff_num', '专职安全生产管理人员数->fulltime_safety_num', '兼职安全生产管理人员数->parttime_safety_num', '上一年经营收入->last_year_income', '固定资产->fixed_assets', '安全生产标准化建设情况->safety_build', '行业监管大类->supervision_large', '国民经济大类->indus_type_large', '是否发生事故->risk_accident_flag', '是否发现问题隐患 0-否 1-是->has_risk_item'] defaulted_count=49
+2026-05-10 13:01:12,321 - agent.workflow - ERROR - 风险评估失败: 模型推理失败: This LogisticRegression instance is not fitted yet. Call 'fit' with appropriate arguments before using this estimator.
+2026-05-10 13:01:12,372 - agent.workflow - INFO - Workflow 输入字段标准化完成: mapped=['企业名称->enterprise_name', '企业职工总人数->staff_num', '专职安全生产管理人员数->fulltime_safety_num', '兼职安全生产管理人员数->parttime_safety_num', '上一年经营收入->last_year_income', '固定资产->fixed_assets', '安全生产标准化建设情况->safety_build', '行业监管大类->supervision_large', '国民经济大类->indus_type_large', '是否发生事故->risk_accident_flag', '是否发现问题隐患 0-否 1-是->has_risk_item'] defaulted_count=49
+2026-05-10 13:01:12,405 - agent.workflow - ERROR - 风险评估失败: 模型推理失败: This LogisticRegression instance is not fitted yet. Call 'fit' with appropriate arguments before using this estimator.
+2026-05-10 13:01:12,407 - api.routers.prediction - WARNING - Workflow 返回结果不完整，降级至 Mock: 模型推理失败: This LogisticRegression instance is not fitted yet. Call 'fit' with appropriate arguments before using this estimator.
+2026-05-10 13:01:17,873 - harness.agentfs - INFO - AgentFS 数据库已初始化
+2026-05-10 13:01:17,919 - harness.agentfs - INFO - AgentFS 数据库已初始化
+2026-05-10 13:01:19,931 - iteration.monitor - INFO - 监控表已初始化
+2026-05-10 13:01:28,139 - iteration.monitor - INFO - 监控表已初始化
+2026-05-10 13:01:28,988 - harness.agentfs - INFO - AgentFS 数据库已初始化
+2026-05-10 13:01:29,031 - harness.agentfs - INFO - AgentFS 数据库已初始化
+2026-05-10 13:02:24,560 - iteration.monitor - INFO - 监控表已初始化
+2026-05-10 13:02:34,292 - iteration.monitor - INFO - 监控表已初始化
+2026-05-10 13:32:21,474 - agent.workflow - INFO - Workflow 输入字段标准化完成: mapped=['企业名称->enterprise_name', '企业职工总人数->staff_num', '专职安全生产管理人员数->fulltime_safety_num', '兼职安全生产管理人员数->parttime_safety_num', '上一年经营收入->last_year_income', '固定资产->fixed_assets', '安全生产标准化建设情况->safety_build', '行业监管大类->supervision_large', '国民经济大类->indus_type_large', '是否发生事故->risk_accident_flag', '是否发现问题隐患 0-否 1-是->has_risk_item'] defaulted_count=49
+2026-05-10 13:32:21,543 - agent.workflow - ERROR - 风险评估失败: 模型推理失败: This LogisticRegression instance is not fitted yet. Call 'fit' with appropriate arguments before using this estimator.
+2026-05-10 13:32:21,550 - agent.workflow - INFO - Workflow 输入字段标准化完成: mapped=['企业名称->enterprise_name', '企业职工总人数->staff_num', '专职安全生产管理人员数->fulltime_safety_num', '兼职安全生产管理人员数->parttime_safety_num', '上一年经营收入->last_year_income', '固定资产->fixed_assets', '安全生产标准化建设情况->safety_build', '行业监管大类->supervision_large', '国民经济大类->indus_type_large', '是否发生事故->risk_accident_flag', '是否发现问题隐患 0-否 1-是->has_risk_item'] defaulted_count=49
+2026-05-10 13:32:21,585 - agent.workflow - ERROR - 风险评估失败: 模型推理失败: This LogisticRegression instance is not fitted yet. Call 'fit' with appropriate arguments before using this estimator.
+2026-05-10 13:32:21,587 - api.routers.prediction - WARNING - Workflow 返回结果不完整，降级至 Mock: 模型推理失败: This LogisticRegression instance is not fitted yet. Call 'fit' with appropriate arguments before using this estimator.
+2026-05-10 13:54:27,655 - api.main - INFO - 应用关闭
+2026-05-11 06:01:10,039 - api.main - INFO - mining_risk_agent v1.0.0 启动中...
+2026-05-11 06:06:50,305 - api.main - INFO - 应用关闭
+2026-05-11 06:09:45,249 - api.main - INFO - mining_risk_agent v1.0.0 启动中...
+2026-05-11 06:29:18,609 - api.main - INFO - 应用关闭
+2026-05-11 06:29:35,715 - api.main - INFO - mining_risk_agent v1.0.0 启动中...
+2026-05-11 06:34:32,447 - iteration.monitor - INFO - 监控表已初始化
+2026-05-11 06:34:35,585 - harness.agentfs - INFO - AgentFS 数据库已初始化
+2026-05-11 06:34:35,746 - harness.agentfs - INFO - AgentFS 数据库已初始化
+2026-05-11 06:34:42,187 - data.preprocessor - INFO - Pipeline 已从 models/preprocessing_pipeline.pkl 加载
+2026-05-11 06:34:42,192 - agent.workflow - INFO - Workflow 输入字段标准化完成: mapped=['企业名称->enterprise_name', '企业职工总人数->staff_num', '专职安全生产管理人员数->fulltime_safety_num', '兼职安全生产管理人员数->parttime_safety_num', '上一年经营收入->last_year_income', '固定资产->fixed_assets', '安全生产标准化建设情况->safety_build', '行业监管大类->supervision_large', '国民经济大类->indus_type_large', '是否发生事故->risk_accident_flag', '是否发现问题隐患 0-否 1-是->has_risk_item'] defaulted_count=49
+2026-05-11 06:34:42,290 - model.stacking - INFO - 基学习器 multinomial_lr (logistic_regression) 已初始化
+2026-05-11 06:34:42,292 - model.stacking - INFO - 基学习器 xgboost (xgboost) 已初始化
+2026-05-11 06:34:42,295 - model.stacking - INFO - 基学习器 lightgbm (lightgbm) 已初始化
+2026-05-11 06:34:42,296 - model.stacking - INFO - 基学习器 catboost (catboost) 已初始化
+2026-05-11 06:34:42,297 - model.stacking - INFO - 基学习器 random_forest (random_forest) 已初始化
+2026-05-11 06:34:42,298 - model.stacking - INFO - 元学习器已初始化
+2026-05-11 06:34:42,467 - agent.workflow - ERROR - 风险评估失败: <class 'keras.src.models.functional.Functional'> could not be deserialized properly. Please ensure that components that are Python object instances (layers, models, etc.) returned by `get_config()` are explicitly deserialized in the model's `from_config()` method.
+
+config={'module': 'keras.src.models.functional', 'class_name': 'Functional', 'config': {}, 'registered_name': 'Functional', 'build_config': {'input_shape': None}, 'compile_config': {'optimizer': {'module': 'keras.optimizers', 'class_name': 'Adam', 'config': {'name': 'adam', 'learning_rate': 0.0010000000474974513, 'weight_decay': None, 'clipnorm': None, 'global_clipnorm': None, 'clipvalue': None, 'use_ema': False, 'ema_momentum': 0.99, 'ema_overwrite_frequency': None, 'loss_scale_factor': None, 'gradient_accumulation_steps': None, 'beta_1': 0.9, 'beta_2': 0.999, 'epsilon': 1e-07, 'amsgrad': False}, 'registered_name': None}, 'loss': 'sparse_categorical_crossentropy', 'loss_weights': None, 'metrics': ['accuracy'], 'weighted_metrics': None, 'run_eagerly': False, 'steps_per_execution': 1, 'jit_compile': False}}.
+
+Exception encountered: <class 'keras.src.layers.core.dense.Dense'> could not be deserialized properly. Please ensure that components that are Python object instances (layers, models, etc.) returned by `get_config()` are explicitly deserialized in the model's `from_config()` method.
+
+config={'module': 'keras.layers', 'class_name': 'Dense', 'config': {'name': 'dense', 'trainable': True, 'dtype': {'module': 'keras', 'class_name': 'DTypePolicy', 'config': {'name': 'float32'}, 'registered_name': None}, 'units': 128, 'activation': 'relu', 'use_bias': True, 'kernel_initializer': {'module': 'keras.initializers', 'class_name': 'GlorotUniform', 'config': {'seed': None}, 'registered_name': None}, 'bias_initializer': {'module': 'keras.initializers', 'class_name': 'Zeros', 'config': {}, 'registered_name': None}, 'kernel_regularizer': None, 'bias_regularizer': None, 'kernel_constraint': None, 'bias_constraint': None, 'quantization_config': None}, 'registered_name': None, 'build_config': {'input_shape': [None, 19]}, 'name': 'dense', 'inbound_nodes': [{'args': [{'class_name': '__keras_tensor__', 'config': {'shape': [None, 19], 'dtype': 'float32', 'keras_history': ['input_layer', 0, 0]}}], 'kwargs': {}}]}.
+
+Exception encountered: Error when deserializing class 'Dense' using config={'name': 'dense', 'trainable': True, 'dtype': 'float32', 'units': 128, 'activation': 'relu', 'use_bias': True, 'kernel_initializer': {'module': 'keras.initializers', 'class_name': 'GlorotUniform', 'config': {'seed': None}, 'registered_name': None}, 'bias_initializer': {'module': 'keras.initializers', 'class_name': 'Zeros', 'config': {}, 'registered_name': None}, 'kernel_regularizer': None, 'bias_regularizer': None, 'kernel_constraint': None, 'bias_constraint': None, 'quantization_config': None}.
+
+Exception encountered: Unrecognized keyword arguments passed to Dense: {'quantization_config': None}
+2026-05-11 06:34:42,487 - agent.workflow - INFO - Workflow 输入字段标准化完成: mapped=['企业名称->enterprise_name', '企业职工总人数->staff_num', '专职安全生产管理人员数->fulltime_safety_num', '兼职安全生产管理人员数->parttime_safety_num', '上一年经营收入->last_year_income', '固定资产->fixed_assets', '安全生产标准化建设情况->safety_build', '行业监管大类->supervision_large', '国民经济大类->indus_type_large', '是否发生事故->risk_accident_flag', '是否发现问题隐患 0-否 1-是->has_risk_item'] defaulted_count=49
+2026-05-11 06:34:42,540 - agent.workflow - ERROR - 风险评估失败: 模型推理失败: This LogisticRegression instance is not fitted yet. Call 'fit' with appropriate arguments before using this estimator.
+2026-05-11 06:34:42,548 - api.routers.prediction - WARNING - Workflow 返回结果不完整，降级至 Mock: 模型推理失败: This LogisticRegression instance is not fitted yet. Call 'fit' with appropriate arguments before using this estimator.
+2026-05-11 06:35:26,300 - harness.agentfs - INFO - AgentFS 数据库已初始化
+2026-05-11 06:35:26,386 - harness.agentfs - INFO - AgentFS 数据库已初始化
+2026-05-11 06:35:31,226 - harness.agentfs - INFO - AgentFS 数据库已初始化
+2026-05-11 06:36:04,341 - iteration.monitor - INFO - 监控表已初始化
+2026-05-11 06:36:11,705 - iteration.monitor - INFO - 监控表已初始化
+2026-05-11 06:36:38,488 - harness.agentfs - INFO - AgentFS 数据库已初始化
+2026-05-11 06:36:38,571 - harness.agentfs - INFO - AgentFS 数据库已初始化
+2026-05-11 06:36:56,618 - agent.workflow - INFO - Workflow 输入字段标准化完成: mapped=['企业名称->enterprise_name', '企业职工总人数->staff_num', '专职安全生产管理人员数->fulltime_safety_num', '兼职安全生产管理人员数->parttime_safety_num', '上一年经营收入->last_year_income', '固定资产->fixed_assets', '安全生产标准化建设情况->safety_build', '行业监管大类->supervision_large', '国民经济大类->indus_type_large', '是否发生事故->risk_accident_flag', '是否发现问题隐患 0-否 1-是->has_risk_item'] defaulted_count=51
+2026-05-11 06:36:56,660 - agent.workflow - ERROR - 风险评估失败: 模型推理失败: This LogisticRegression instance is not fitted yet. Call 'fit' with appropriate arguments before using this estimator.
+2026-05-11 06:36:56,672 - agent.workflow - INFO - Workflow 输入字段标准化完成: mapped=['企业名称->enterprise_name', '企业职工总人数->staff_num', '专职安全生产管理人员数->fulltime_safety_num', '兼职安全生产管理人员数->parttime_safety_num', '上一年经营收入->last_year_income', '固定资产->fixed_assets', '安全生产标准化建设情况->safety_build', '行业监管大类->supervision_large', '国民经济大类->indus_type_large', '是否发生事故->risk_accident_flag', '是否发现问题隐患 0-否 1-是->has_risk_item'] defaulted_count=51
+2026-05-11 06:36:56,723 - agent.workflow - ERROR - 风险评估失败: 模型推理失败: This LogisticRegression instance is not fitted yet. Call 'fit' with appropriate arguments before using this estimator.
+2026-05-11 06:36:56,732 - api.routers.prediction - WARNING - Workflow 返回结果不完整，降级至 Mock: 模型推理失败: This LogisticRegression instance is not fitted yet. Call 'fit' with appropriate arguments before using this estimator.
+2026-05-11 06:37:21,699 - harness.agentfs - INFO - AgentFS 数据库已初始化
+2026-05-11 06:37:21,790 - harness.agentfs - INFO - AgentFS 数据库已初始化
+2026-05-11 06:59:28,411 - agent.workflow - INFO - Workflow 输入字段标准化完成: mapped=['企业名称->enterprise_name', '企业职工总人数->staff_num', '专职安全生产管理人员数->fulltime_safety_num', '兼职安全生产管理人员数->parttime_safety_num', '上一年经营收入->last_year_income', '固定资产->fixed_assets', '安全生产标准化建设情况->safety_build', '行业监管大类->supervision_large', '国民经济大类->indus_type_large', '是否发生事故->risk_accident_flag', '是否发现问题隐患 0-否 1-是->has_risk_item', '湿式除尘器数量->dust_shishi_num'] defaulted_count=51
+2026-05-11 06:59:28,475 - agent.workflow - ERROR - 风险评估失败: 模型推理失败: This LogisticRegression instance is not fitted yet. Call 'fit' with appropriate arguments before using this estimator.
+2026-05-11 06:59:28,485 - agent.workflow - INFO - Workflow 输入字段标准化完成: mapped=['企业名称->enterprise_name', '企业职工总人数->staff_num', '专职安全生产管理人员数->fulltime_safety_num', '兼职安全生产管理人员数->parttime_safety_num', '上一年经营收入->last_year_income', '固定资产->fixed_assets', '安全生产标准化建设情况->safety_build', '行业监管大类->supervision_large', '国民经济大类->indus_type_large', '是否发生事故->risk_accident_flag', '是否发现问题隐患 0-否 1-是->has_risk_item', '湿式除尘器数量->dust_shishi_num'] defaulted_count=51
+2026-05-11 06:59:28,531 - agent.workflow - ERROR - 风险评估失败: 模型推理失败: This LogisticRegression instance is not fitted yet. Call 'fit' with appropriate arguments before using this estimator.
+2026-05-11 06:59:28,534 - api.routers.prediction - WARNING - Workflow 返回结果不完整，降级至 Mock: 模型推理失败: This LogisticRegression instance is not fitted yet. Call 'fit' with appropriate arguments before using this estimator.
+2026-05-11 06:59:36,590 - harness.agentfs - INFO - AgentFS 数据库已初始化
+2026-05-11 06:59:36,700 - harness.agentfs - INFO - AgentFS 数据库已初始化
+2026-05-11 06:59:42,525 - agent.workflow - INFO - Workflow 输入字段标准化完成: mapped=['企业名称->enterprise_name', '企业职工总人数->staff_num', '专职安全生产管理人员数->fulltime_safety_num', '兼职安全生产管理人员数->parttime_safety_num', '上一年经营收入->last_year_income', '固定资产->fixed_assets', '安全生产标准化建设情况->safety_build', '行业监管大类->supervision_large', '国民经济大类->indus_type_large', '是否发生事故->risk_accident_flag', '是否发现问题隐患 0-否 1-是->has_risk_item', '湿式除尘器数量->dust_shishi_num'] defaulted_count=51
+2026-05-11 06:59:42,569 - agent.workflow - ERROR - 风险评估失败: 模型推理失败: This LogisticRegression instance is not fitted yet. Call 'fit' with appropriate arguments before using this estimator.
+2026-05-11 06:59:42,582 - agent.workflow - INFO - Workflow 输入字段标准化完成: mapped=['企业名称->enterprise_name', '企业职工总人数->staff_num', '专职安全生产管理人员数->fulltime_safety_num', '兼职安全生产管理人员数->parttime_safety_num', '上一年经营收入->last_year_income', '固定资产->fixed_assets', '安全生产标准化建设情况->safety_build', '行业监管大类->supervision_large', '国民经济大类->indus_type_large', '是否发生事故->risk_accident_flag', '是否发现问题隐患 0-否 1-是->has_risk_item', '湿式除尘器数量->dust_shishi_num'] defaulted_count=51
+2026-05-11 06:59:42,634 - agent.workflow - ERROR - 风险评估失败: 模型推理失败: This LogisticRegression instance is not fitted yet. Call 'fit' with appropriate arguments before using this estimator.
+2026-05-11 06:59:42,637 - api.routers.prediction - WARNING - Workflow 返回结果不完整，降级至 Mock: 模型推理失败: This LogisticRegression instance is not fitted yet. Call 'fit' with appropriate arguments before using this estimator.
+2026-05-11 07:08:01,544 - harness.agentfs - INFO - AgentFS 数据库已初始化
+2026-05-11 07:08:01,689 - harness.agentfs - INFO - AgentFS 数据库已初始化
+2026-05-11 07:08:18,043 - iteration.monitor - INFO - 监控表已初始化
+2026-05-11 07:44:44,522 - api.main - INFO - 应用关闭
+2026-05-11 08:03:17,057 - api.main - INFO - mining_risk_agent v1.0.0 启动中...
+2026-05-11 08:04:32,981 - iteration.monitor - INFO - 监控表已初始化
+2026-05-11 08:04:34,600 - iteration.monitor - INFO - 监控表已初始化
+2026-05-11 08:04:37,697 - iteration.monitor - INFO - 监控表已初始化
+2026-05-11 08:04:40,193 - data.preprocessor - INFO - Pipeline 已从 models/preprocessing_pipeline.pkl 加载
+2026-05-11 08:04:40,195 - agent.workflow - INFO - Workflow 输入字段标准化完成: mapped=['企业名称->enterprise_name', '企业职工总人数->staff_num', '专职安全生产管理人员数->fulltime_safety_num', '兼职安全生产管理人员数->parttime_safety_num', '上一年经营收入->last_year_income', '固定资产->fixed_assets', '安全生产标准化建设情况->safety_build', '行业监管大类->supervision_large', '国民经济大类->indus_type_large', '是否发生事故->risk_accident_flag', '是否发现问题隐患 0-否 1-是->has_risk_item'] defaulted_count=49
+2026-05-11 08:04:40,273 - model.stacking - INFO - 基学习器 multinomial_lr (logistic_regression) 已初始化
+2026-05-11 08:04:40,275 - model.stacking - INFO - 基学习器 xgboost (xgboost) 已初始化
+2026-05-11 08:04:40,277 - model.stacking - INFO - 基学习器 lightgbm (lightgbm) 已初始化
+2026-05-11 08:04:40,280 - model.stacking - INFO - 基学习器 catboost (catboost) 已初始化
+2026-05-11 08:04:40,282 - model.stacking - INFO - 基学习器 random_forest (random_forest) 已初始化
+2026-05-11 08:04:40,283 - model.stacking - INFO - 元学习器已初始化
+2026-05-11 08:04:40,419 - agent.workflow - ERROR - 风险评估失败: <class 'keras.src.models.functional.Functional'> could not be deserialized properly. Please ensure that components that are Python object instances (layers, models, etc.) returned by `get_config()` are explicitly deserialized in the model's `from_config()` method.
+
+config={'module': 'keras.src.models.functional', 'class_name': 'Functional', 'config': {}, 'registered_name': 'Functional', 'build_config': {'input_shape': None}, 'compile_config': {'optimizer': {'module': 'keras.optimizers', 'class_name': 'Adam', 'config': {'name': 'adam', 'learning_rate': 0.0010000000474974513, 'weight_decay': None, 'clipnorm': None, 'global_clipnorm': None, 'clipvalue': None, 'use_ema': False, 'ema_momentum': 0.99, 'ema_overwrite_frequency': None, 'loss_scale_factor': None, 'gradient_accumulation_steps': None, 'beta_1': 0.9, 'beta_2': 0.999, 'epsilon': 1e-07, 'amsgrad': False}, 'registered_name': None}, 'loss': 'sparse_categorical_crossentropy', 'loss_weights': None, 'metrics': ['accuracy'], 'weighted_metrics': None, 'run_eagerly': False, 'steps_per_execution': 1, 'jit_compile': False}}.
+
+Exception encountered: <class 'keras.src.layers.core.dense.Dense'> could not be deserialized properly. Please ensure that components that are Python object instances (layers, models, etc.) returned by `get_config()` are explicitly deserialized in the model's `from_config()` method.
+
+config={'module': 'keras.layers', 'class_name': 'Dense', 'config': {'name': 'dense', 'trainable': True, 'dtype': {'module': 'keras', 'class_name': 'DTypePolicy', 'config': {'name': 'float32'}, 'registered_name': None}, 'units': 128, 'activation': 'relu', 'use_bias': True, 'kernel_initializer': {'module': 'keras.initializers', 'class_name': 'GlorotUniform', 'config': {'seed': None}, 'registered_name': None}, 'bias_initializer': {'module': 'keras.initializers', 'class_name': 'Zeros', 'config': {}, 'registered_name': None}, 'kernel_regularizer': None, 'bias_regularizer': None, 'kernel_constraint': None, 'bias_constraint': None, 'quantization_config': None}, 'registered_name': None, 'build_config': {'input_shape': [None, 19]}, 'name': 'dense', 'inbound_nodes': [{'args': [{'class_name': '__keras_tensor__', 'config': {'shape': [None, 19], 'dtype': 'float32', 'keras_history': ['input_layer', 0, 0]}}], 'kwargs': {}}]}.
+
+Exception encountered: Error when deserializing class 'Dense' using config={'name': 'dense', 'trainable': True, 'dtype': 'float32', 'units': 128, 'activation': 'relu', 'use_bias': True, 'kernel_initializer': {'module': 'keras.initializers', 'class_name': 'GlorotUniform', 'config': {'seed': None}, 'registered_name': None}, 'bias_initializer': {'module': 'keras.initializers', 'class_name': 'Zeros', 'config': {}, 'registered_name': None}, 'kernel_regularizer': None, 'bias_regularizer': None, 'kernel_constraint': None, 'bias_constraint': None, 'quantization_config': None}.
+
+Exception encountered: Unrecognized keyword arguments passed to Dense: {'quantization_config': None}
+2026-05-11 08:04:40,433 - agent.workflow - INFO - Workflow 输入字段标准化完成: mapped=['企业名称->enterprise_name', '企业职工总人数->staff_num', '专职安全生产管理人员数->fulltime_safety_num', '兼职安全生产管理人员数->parttime_safety_num', '上一年经营收入->last_year_income', '固定资产->fixed_assets', '安全生产标准化建设情况->safety_build', '行业监管大类->supervision_large', '国民经济大类->indus_type_large', '是否发生事故->risk_accident_flag', '是否发现问题隐患 0-否 1-是->has_risk_item'] defaulted_count=49
+2026-05-11 08:04:40,478 - agent.workflow - ERROR - 风险评估失败: 模型推理失败: This LogisticRegression instance is not fitted yet. Call 'fit' with appropriate arguments before using this estimator.
+2026-05-11 08:04:40,482 - api.routers.prediction - WARNING - Workflow 返回结果不完整，降级至 Mock: 模型推理失败: This LogisticRegression instance is not fitted yet. Call 'fit' with appropriate arguments before using this estimator.
+2026-05-11 08:04:55,755 - iteration.monitor - INFO - 监控表已初始化
+2026-05-11 08:05:06,564 - iteration.monitor - INFO - 监控表已初始化
+2026-05-11 08:05:14,557 - iteration.monitor - INFO - 监控表已初始化
+2026-05-11 08:06:52,353 - iteration.monitor - INFO - 监控表已初始化
+2026-05-11 08:11:04,627 - harness.agentfs - INFO - AgentFS 数据库已初始化
+2026-05-11 08:11:04,724 - harness.agentfs - INFO - AgentFS 数据库已初始化
+2026-05-11 08:11:09,764 - api.routers.data - ERROR - 数据上传失败: API 数据加载失败: 'utf-8' codec can't decode byte 0xc0 in position 15: invalid start byte
+2026-05-11 08:11:47,840 - harness.agentfs - INFO - AgentFS 数据库已初始化
+2026-05-11 08:11:47,946 - harness.agentfs - INFO - AgentFS 数据库已初始化
+2026-05-11 08:11:51,642 - iteration.monitor - INFO - 监控表已初始化
+2026-05-11 08:11:58,627 - iteration.monitor - INFO - 监控表已初始化
+2026-05-11 08:12:03,989 - agent.workflow - INFO - Workflow 输入字段标准化完成: mapped=['企业名称->enterprise_name', '企业职工总人数->staff_num', '专职安全生产管理人员数->fulltime_safety_num', '兼职安全生产管理人员数->parttime_safety_num', '上一年经营收入->last_year_income', '固定资产->fixed_assets', '安全生产标准化建设情况->safety_build', '行业监管大类->supervision_large', '国民经济大类->indus_type_large', '是否发生事故->risk_accident_flag', '是否发现问题隐患 0-否 1-是->has_risk_item'] defaulted_count=51
+2026-05-11 08:12:04,060 - agent.workflow - ERROR - 风险评估失败: 模型推理失败: This LogisticRegression instance is not fitted yet. Call 'fit' with appropriate arguments before using this estimator.
+2026-05-11 08:12:04,072 - agent.workflow - INFO - Workflow 输入字段标准化完成: mapped=['企业名称->enterprise_name', '企业职工总人数->staff_num', '专职安全生产管理人员数->fulltime_safety_num', '兼职安全生产管理人员数->parttime_safety_num', '上一年经营收入->last_year_income', '固定资产->fixed_assets', '安全生产标准化建设情况->safety_build', '行业监管大类->supervision_large', '国民经济大类->indus_type_large', '是否发生事故->risk_accident_flag', '是否发现问题隐患 0-否 1-是->has_risk_item'] defaulted_count=51
+2026-05-11 08:12:04,123 - agent.workflow - ERROR - 风险评估失败: 模型推理失败: This LogisticRegression instance is not fitted yet. Call 'fit' with appropriate arguments before using this estimator.
+2026-05-11 08:12:04,126 - api.routers.prediction - WARNING - Workflow 返回结果不完整，降级至 Mock: 模型推理失败: This LogisticRegression instance is not fitted yet. Call 'fit' with appropriate arguments before using this estimator.
+2026-05-11 08:26:26,210 - harness.agentfs - INFO - AgentFS 数据库已初始化
+2026-05-11 08:26:26,356 - harness.agentfs - INFO - AgentFS 数据库已初始化
+2026-05-11 08:26:41,570 - api.routers.data - ERROR - 数据上传失败: API 数据加载失败: 'utf-8' codec can't decode byte 0xc0 in position 15: invalid start byte
+2026-05-11 08:36:19,858 - iteration.monitor - INFO - 监控表已初始化
+2026-05-11 08:36:50,590 - agent.workflow - INFO - Workflow 输入字段标准化完成: mapped=['企业名称->enterprise_name', '企业职工总人数->staff_num', '专职安全生产管理人员数->fulltime_safety_num', '兼职安全生产管理人员数->parttime_safety_num', '上一年经营收入->last_year_income', '固定资产->fixed_assets', '安全生产标准化建设情况->safety_build', '行业监管大类->supervision_large', '国民经济大类->indus_type_large', '是否发生事故->risk_accident_flag', '是否发现问题隐患 0-否 1-是->has_risk_item'] defaulted_count=49
+2026-05-11 08:36:50,664 - agent.workflow - ERROR - 风险评估失败: 模型推理失败: This LogisticRegression instance is not fitted yet. Call 'fit' with appropriate arguments before using this estimator.
+2026-05-11 08:36:50,677 - agent.workflow - INFO - Workflow 输入字段标准化完成: mapped=['企业名称->enterprise_name', '企业职工总人数->staff_num', '专职安全生产管理人员数->fulltime_safety_num', '兼职安全生产管理人员数->parttime_safety_num', '上一年经营收入->last_year_income', '固定资产->fixed_assets', '安全生产标准化建设情况->safety_build', '行业监管大类->supervision_large', '国民经济大类->indus_type_large', '是否发生事故->risk_accident_flag', '是否发现问题隐患 0-否 1-是->has_risk_item'] defaulted_count=49
+2026-05-11 08:36:50,723 - agent.workflow - ERROR - 风险评估失败: 模型推理失败: This LogisticRegression instance is not fitted yet. Call 'fit' with appropriate arguments before using this estimator.
+2026-05-11 08:36:50,727 - api.routers.prediction - WARNING - Workflow 返回结果不完整，降级至 Mock: 模型推理失败: This LogisticRegression instance is not fitted yet. Call 'fit' with appropriate arguments before using this estimator.
+2026-05-11 08:36:56,594 - iteration.monitor - INFO - 监控表已初始化
+2026-05-11 08:40:00,049 - iteration.monitor - INFO - 监控表已初始化
+2026-05-11 08:44:55,737 - iteration.monitor - INFO - 监控表已初始化
+2026-05-11 08:48:13,309 - iteration.monitor - INFO - 监控表已初始化
+2026-05-11 08:48:18,134 - iteration.monitor - INFO - 监控表已初始化
+2026-05-11 08:48:24,314 - agent.workflow - INFO - Workflow 输入字段标准化完成: mapped=['企业名称->enterprise_name', '企业职工总人数->staff_num', '专职安全生产管理人员数->fulltime_safety_num', '兼职安全生产管理人员数->parttime_safety_num', '上一年经营收入->last_year_income', '固定资产->fixed_assets', '安全生产标准化建设情况->safety_build', '行业监管大类->supervision_large', '国民经济大类->indus_type_large', '是否发生事故->risk_accident_flag', '是否发现问题隐患 0-否 1-是->has_risk_item'] defaulted_count=49
+2026-05-11 08:48:24,407 - agent.workflow - ERROR - 风险评估失败: 模型推理失败: This LogisticRegression instance is not fitted yet. Call 'fit' with appropriate arguments before using this estimator.
+2026-05-11 08:48:24,420 - agent.workflow - INFO - Workflow 输入字段标准化完成: mapped=['企业名称->enterprise_name', '企业职工总人数->staff_num', '专职安全生产管理人员数->fulltime_safety_num', '兼职安全生产管理人员数->parttime_safety_num', '上一年经营收入->last_year_income', '固定资产->fixed_assets', '安全生产标准化建设情况->safety_build', '行业监管大类->supervision_large', '国民经济大类->indus_type_large', '是否发生事故->risk_accident_flag', '是否发现问题隐患 0-否 1-是->has_risk_item'] defaulted_count=49
+2026-05-11 08:48:24,465 - agent.workflow - ERROR - 风险评估失败: 模型推理失败: This LogisticRegression instance is not fitted yet. Call 'fit' with appropriate arguments before using this estimator.
+2026-05-11 08:48:24,467 - api.routers.prediction - WARNING - Workflow 返回结果不完整，降级至 Mock: 模型推理失败: This LogisticRegression instance is not fitted yet. Call 'fit' with appropriate arguments before using this estimator.
+2026-05-11 08:55:45,395 - iteration.monitor - INFO - 监控表已初始化
+2026-05-11 08:55:51,949 - agent.workflow - INFO - Workflow 输入字段标准化完成: mapped=['企业名称->enterprise_name', '企业职工总人数->staff_num', '专职安全生产管理人员数->fulltime_safety_num', '兼职安全生产管理人员数->parttime_safety_num', '上一年经营收入->last_year_income', '固定资产->fixed_assets', '安全生产标准化建设情况->safety_build', '行业监管大类->supervision_large', '国民经济大类->indus_type_large', '是否发生事故->risk_accident_flag', '是否发现问题隐患 0-否 1-是->has_risk_item'] defaulted_count=49
+2026-05-11 08:55:52,016 - agent.workflow - ERROR - 风险评估失败: 模型推理失败: This LogisticRegression instance is not fitted yet. Call 'fit' with appropriate arguments before using this estimator.
+2026-05-11 08:55:52,027 - agent.workflow - INFO - Workflow 输入字段标准化完成: mapped=['企业名称->enterprise_name', '企业职工总人数->staff_num', '专职安全生产管理人员数->fulltime_safety_num', '兼职安全生产管理人员数->parttime_safety_num', '上一年经营收入->last_year_income', '固定资产->fixed_assets', '安全生产标准化建设情况->safety_build', '行业监管大类->supervision_large', '国民经济大类->indus_type_large', '是否发生事故->risk_accident_flag', '是否发现问题隐患 0-否 1-是->has_risk_item'] defaulted_count=49
+2026-05-11 08:55:52,066 - agent.workflow - ERROR - 风险评估失败: 模型推理失败: This LogisticRegression instance is not fitted yet. Call 'fit' with appropriate arguments before using this estimator.
+2026-05-11 08:55:52,069 - api.routers.prediction - WARNING - Workflow 返回结果不完整，降级至 Mock: 模型推理失败: This LogisticRegression instance is not fitted yet. Call 'fit' with appropriate arguments before using this estimator.
+2026-05-11 08:55:55,125 - iteration.monitor - INFO - 监控表已初始化
+2026-05-11 09:48:40,667 - iteration.monitor - INFO - 监控表已初始化
+2026-05-11 09:48:58,366 - api.main - INFO - 应用关闭
+2026-05-11 09:54:06,630 - api.main - INFO - mining_risk_agent v1.0.0 启动中...
+2026-05-11 09:54:29,169 - iteration.monitor - INFO - 监控表已初始化
+2026-05-11 09:54:48,316 - iteration.monitor - INFO - 监控表已初始化
+2026-05-11 09:55:00,579 - api.routers.data - ERROR - 数据上传失败: API 数据加载失败: 'utf-8' codec can't decode byte 0xe6 in position 10: invalid continuation byte
+2026-05-11 09:59:40,365 - api.main - INFO - 应用关闭
+2026-05-11 10:00:23,562 - api.main - INFO - mining_risk_agent v1.0.0 启动中...
+2026-05-11 10:00:31,704 - api.main - INFO - 应用关闭
+2026-05-11 10:00:51,266 - api.main - INFO - mining_risk_agent v1.0.0 启动中...
+2026-05-11 10:00:52,775 - api.main - INFO - 应用关闭
+2026-05-11 10:01:04,008 - api.main - INFO - mining_risk_agent v1.0.0 启动中...
+2026-05-11 10:01:25,728 - iteration.monitor - INFO - 监控表已初始化
+2026-05-11 10:01:27,497 - iteration.monitor - INFO - 监控表已初始化
+2026-05-11 10:01:59,827 - api.routers.memory - INFO - 开始预测分析文件: szs_business_address.xlsx, 大小: 303778 bytes, 格式: .xlsx
+2026-05-11 10:02:00,012 - api.routers.memory - INFO - 数据形状: (2013, 20), 开始逐行预测分析...
+2026-05-11 10:02:00,078 - api.routers.memory - INFO - 完成 200 条企业预测分析
+2026-05-11 10:02:14,070 - iteration.monitor - INFO - 监控表已初始化
+2026-05-11 10:02:20,725 - iteration.monitor - INFO - 监控表已初始化
+2026-05-11 10:08:45,485 - iteration.monitor - INFO - 监控表已初始化
+2026-05-11 10:08:52,410 - iteration.monitor - INFO - 监控表已初始化
+2026-05-11 10:09:18,482 - iteration.monitor - INFO - 监控表已初始化
+2026-05-11 10:09:26,174 - data.preprocessor - INFO - Pipeline 已从 models/preprocessing_pipeline.pkl 加载
+2026-05-11 10:09:26,175 - agent.workflow - INFO - Workflow 输入字段标准化完成: mapped=['企业名称->enterprise_name', '企业职工总人数->staff_num', '专职安全生产管理人员数->fulltime_safety_num', '兼职安全生产管理人员数->parttime_safety_num', '上一年经营收入->last_year_income', '固定资产->fixed_assets', '安全生产标准化建设情况->safety_build', '行业监管大类->supervision_large', '国民经济大类->indus_type_large', '是否发生事故->risk_accident_flag', '是否发现问题隐患 0-否 1-是->has_risk_item'] defaulted_count=49
+2026-05-11 10:09:26,234 - model.stacking - INFO - 基学习器 multinomial_lr (logistic_regression) 已初始化
+2026-05-11 10:09:26,235 - model.stacking - INFO - 基学习器 xgboost (xgboost) 已初始化
+2026-05-11 10:09:26,236 - model.stacking - INFO - 基学习器 lightgbm (lightgbm) 已初始化
+2026-05-11 10:09:26,237 - model.stacking - INFO - 基学习器 catboost (catboost) 已初始化
+2026-05-11 10:09:26,238 - model.stacking - INFO - 基学习器 random_forest (random_forest) 已初始化
+2026-05-11 10:09:26,239 - model.stacking - INFO - 元学习器已初始化
+2026-05-11 10:09:26,335 - agent.workflow - ERROR - 风险评估失败: <class 'keras.src.models.functional.Functional'> could not be deserialized properly. Please ensure that components that are Python object instances (layers, models, etc.) returned by `get_config()` are explicitly deserialized in the model's `from_config()` method.
+
+config={'module': 'keras.src.models.functional', 'class_name': 'Functional', 'config': {}, 'registered_name': 'Functional', 'build_config': {'input_shape': None}, 'compile_config': {'optimizer': {'module': 'keras.optimizers', 'class_name': 'Adam', 'config': {'name': 'adam', 'learning_rate': 0.0010000000474974513, 'weight_decay': None, 'clipnorm': None, 'global_clipnorm': None, 'clipvalue': None, 'use_ema': False, 'ema_momentum': 0.99, 'ema_overwrite_frequency': None, 'loss_scale_factor': None, 'gradient_accumulation_steps': None, 'beta_1': 0.9, 'beta_2': 0.999, 'epsilon': 1e-07, 'amsgrad': False}, 'registered_name': None}, 'loss': 'sparse_categorical_crossentropy', 'loss_weights': None, 'metrics': ['accuracy'], 'weighted_metrics': None, 'run_eagerly': False, 'steps_per_execution': 1, 'jit_compile': False}}.
+
+Exception encountered: <class 'keras.src.layers.core.dense.Dense'> could not be deserialized properly. Please ensure that components that are Python object instances (layers, models, etc.) returned by `get_config()` are explicitly deserialized in the model's `from_config()` method.
+
+config={'module': 'keras.layers', 'class_name': 'Dense', 'config': {'name': 'dense', 'trainable': True, 'dtype': {'module': 'keras', 'class_name': 'DTypePolicy', 'config': {'name': 'float32'}, 'registered_name': None}, 'units': 128, 'activation': 'relu', 'use_bias': True, 'kernel_initializer': {'module': 'keras.initializers', 'class_name': 'GlorotUniform', 'config': {'seed': None}, 'registered_name': None}, 'bias_initializer': {'module': 'keras.initializers', 'class_name': 'Zeros', 'config': {}, 'registered_name': None}, 'kernel_regularizer': None, 'bias_regularizer': None, 'kernel_constraint': None, 'bias_constraint': None, 'quantization_config': None}, 'registered_name': None, 'build_config': {'input_shape': [None, 19]}, 'name': 'dense', 'inbound_nodes': [{'args': [{'class_name': '__keras_tensor__', 'config': {'shape': [None, 19], 'dtype': 'float32', 'keras_history': ['input_layer', 0, 0]}}], 'kwargs': {}}]}.
+
+Exception encountered: Error when deserializing class 'Dense' using config={'name': 'dense', 'trainable': True, 'dtype': 'float32', 'units': 128, 'activation': 'relu', 'use_bias': True, 'kernel_initializer': {'module': 'keras.initializers', 'class_name': 'GlorotUniform', 'config': {'seed': None}, 'registered_name': None}, 'bias_initializer': {'module': 'keras.initializers', 'class_name': 'Zeros', 'config': {}, 'registered_name': None}, 'kernel_regularizer': None, 'bias_regularizer': None, 'kernel_constraint': None, 'bias_constraint': None, 'quantization_config': None}.
+
+Exception encountered: Unrecognized keyword arguments passed to Dense: {'quantization_config': None}
+2026-05-11 10:09:26,352 - agent.workflow - INFO - Workflow 输入字段标准化完成: mapped=['企业名称->enterprise_name', '企业职工总人数->staff_num', '专职安全生产管理人员数->fulltime_safety_num', '兼职安全生产管理人员数->parttime_safety_num', '上一年经营收入->last_year_income', '固定资产->fixed_assets', '安全生产标准化建设情况->safety_build', '行业监管大类->supervision_large', '国民经济大类->indus_type_large', '是否发生事故->risk_accident_flag', '是否发现问题隐患 0-否 1-是->has_risk_item'] defaulted_count=49
+2026-05-11 10:09:26,390 - agent.workflow - ERROR - 风险评估失败: 模型推理失败: This LogisticRegression instance is not fitted yet. Call 'fit' with appropriate arguments before using this estimator.
+2026-05-11 10:09:26,392 - api.routers.prediction - WARNING - Workflow 返回结果不完整，降级至 Mock: 模型推理失败: This LogisticRegression instance is not fitted yet. Call 'fit' with appropriate arguments before using this estimator.
+2026-05-11 10:09:29,674 - agent.workflow - INFO - Workflow 输入字段标准化完成: mapped=['企业名称->enterprise_name', '企业职工总人数->staff_num', '专职安全生产管理人员数->fulltime_safety_num', '兼职安全生产管理人员数->parttime_safety_num', '上一年经营收入->last_year_income', '固定资产->fixed_assets', '安全生产标准化建设情况->safety_build', '行业监管大类->supervision_large', '国民经济大类->indus_type_large', '是否发生事故->risk_accident_flag', '是否发现问题隐患 0-否 1-是->has_risk_item'] defaulted_count=51
+2026-05-11 10:09:29,711 - agent.workflow - ERROR - 风险评估失败: 模型推理失败: This LogisticRegression instance is not fitted yet. Call 'fit' with appropriate arguments before using this estimator.
+2026-05-11 10:09:29,720 - agent.workflow - INFO - Workflow 输入字段标准化完成: mapped=['企业名称->enterprise_name', '企业职工总人数->staff_num', '专职安全生产管理人员数->fulltime_safety_num', '兼职安全生产管理人员数->parttime_safety_num', '上一年经营收入->last_year_income', '固定资产->fixed_assets', '安全生产标准化建设情况->safety_build', '行业监管大类->supervision_large', '国民经济大类->indus_type_large', '是否发生事故->risk_accident_flag', '是否发现问题隐患 0-否 1-是->has_risk_item'] defaulted_count=51
+2026-05-11 10:09:29,755 - agent.workflow - ERROR - 风险评估失败: 模型推理失败: This LogisticRegression instance is not fitted yet. Call 'fit' with appropriate arguments before using this estimator.
+2026-05-11 10:09:29,757 - api.routers.prediction - WARNING - Workflow 返回结果不完整，降级至 Mock: 模型推理失败: This LogisticRegression instance is not fitted yet. Call 'fit' with appropriate arguments before using this estimator.
+2026-05-11 10:09:32,715 - api.routers.data - ERROR - 数据上传失败: API 数据加载失败: 'utf-8' codec can't decode byte 0xda in position 10: invalid continuation byte
+2026-05-11 10:10:00,173 - api.routers.memory - INFO - 开始导入文件: st_enterprise_production_status_record.xlsx, 大小: 7270 bytes, 格式: .xlsx
+2026-05-11 10:10:00,185 - api.routers.memory - INFO - 使用 openpyxl 引擎成功读取Excel文件
+2026-05-11 10:10:00,188 - api.routers.memory - INFO - 数据形状: (44, 15), 列名: ['dms_timestamp', 'ID', 'ENTERPRISE_ID', 'PRODUCTION_STATUS', 'STOP_REASON']...
+2026-05-11 10:10:00,202 - api.routers.memory - INFO - 成功生成 45 条长期记忆条目
+2026-05-11 10:10:04,416 - iteration.monitor - INFO - 监控表已初始化
+2026-05-11 10:10:45,521 - iteration.monitor - INFO - 监控表已初始化
+2026-05-11 10:11:56,971 - api.routers.memory - INFO - 开始预测分析文件: st_enterprise_production_status_record.xlsx, 大小: 7270 bytes, 格式: .xlsx
+2026-05-11 10:11:56,981 - api.routers.memory - INFO - 数据形状: (44, 15), 开始逐行预测分析...
+2026-05-11 10:11:56,992 - api.routers.memory - INFO - 完成 44 条企业预测分析
+2026-05-11 10:12:03,359 - api.routers.memory - INFO - 开始预测分析文件: szs_ent_label_report_history.xlsx, 大小: 40986 bytes, 格式: .xlsx
+2026-05-11 10:12:03,392 - api.routers.memory - INFO - 数据形状: (834, 10), 开始逐行预测分析...
+2026-05-11 10:12:03,426 - api.routers.memory - INFO - 完成 200 条企业预测分析
+2026-05-11 10:12:12,704 - api.routers.memory - INFO - 开始导入文件: szs_enterprise_safety.xlsx, 大小: 459237 bytes, 格式: .xlsx
+2026-05-11 10:12:12,925 - api.routers.memory - INFO - 使用 openpyxl 引擎成功读取Excel文件
+2026-05-11 10:12:12,927 - api.routers.memory - INFO - 数据形状: (1970, 37), 列名: ['dms_timestamp', 'SAFETY_DEPT_NUM', 'MANAGE_PERSON_TEL', 'SAFETY_PERSON_CERT', 'MANAGE_PERSON']...
+2026-05-11 10:12:12,975 - api.routers.memory - INFO - 成功生成 501 条长期记忆条目
+2026-05-11 10:22:52,518 - agent.workflow - INFO - Workflow 输入字段标准化完成: mapped=['企业名称->enterprise_name', '企业职工总人数->staff_num', '专职安全生产管理人员数->fulltime_safety_num', '兼职安全生产管理人员数->parttime_safety_num', '上一年经营收入->last_year_income', '固定资产->fixed_assets', '安全生产标准化建设情况->safety_build', '行业监管大类->supervision_large', '国民经济大类->indus_type_large', '是否发生事故->risk_accident_flag', '是否发现问题隐患 0-否 1-是->has_risk_item', '湿式除尘器数量->dust_shishi_num'] defaulted_count=51
+2026-05-11 10:22:52,564 - agent.workflow - ERROR - 风险评估失败: 模型推理失败: This LogisticRegression instance is not fitted yet. Call 'fit' with appropriate arguments before using this estimator.
+2026-05-11 10:22:52,571 - agent.workflow - INFO - Workflow 输入字段标准化完成: mapped=['企业名称->enterprise_name', '企业职工总人数->staff_num', '专职安全生产管理人员数->fulltime_safety_num', '兼职安全生产管理人员数->parttime_safety_num', '上一年经营收入->last_year_income', '固定资产->fixed_assets', '安全生产标准化建设情况->safety_build', '行业监管大类->supervision_large', '国民经济大类->indus_type_large', '是否发生事故->risk_accident_flag', '是否发现问题隐患 0-否 1-是->has_risk_item', '湿式除尘器数量->dust_shishi_num'] defaulted_count=51
+2026-05-11 10:22:52,607 - agent.workflow - ERROR - 风险评估失败: 模型推理失败: This LogisticRegression instance is not fitted yet. Call 'fit' with appropriate arguments before using this estimator.
+2026-05-11 10:22:52,610 - api.routers.prediction - WARNING - Workflow 返回结果不完整，降级至 Mock: 模型推理失败: This LogisticRegression instance is not fitted yet. Call 'fit' with appropriate arguments before using this estimator.
+2026-05-11 10:23:21,629 - api.routers.memory - INFO - 开始预测分析文件: zjstreet2_gcj02.xlsx, 大小: 44682 bytes, 格式: .xlsx
+2026-05-11 10:23:21,656 - api.routers.memory - INFO - 数据形状: (153, 31), 开始逐行预测分析...
+2026-05-11 10:23:21,683 - api.routers.memory - INFO - 完成 153 条企业预测分析
+2026-05-11 10:23:28,096 - api.routers.memory - INFO - 开始预测分析文件: st_enterprise_directory.xlsx, 大小: 87594 bytes, 格式: .xlsx
+2026-05-11 10:23:28,163 - api.routers.memory - INFO - 数据形状: (500, 41), 开始逐行预测分析...
+2026-05-11 10:23:28,239 - api.routers.memory - INFO - 完成 200 条企业预测分析
+2026-05-11 10:24:08,703 - iteration.monitor - INFO - 监控表已初始化
+2026-05-11 10:45:21,528 - iteration.monitor - INFO - 监控表已初始化
+2026-05-11 10:45:23,125 - iteration.monitor - INFO - 监控表已初始化
+2026-05-11 10:45:27,565 - iteration.monitor - INFO - 监控表已初始化
+2026-05-11 10:46:48,312 - iteration.monitor - INFO - 监控表已初始化
+2026-05-11 10:46:57,683 - api.routers.memory - INFO - 开始预测分析文件: st_enterprise_directory.xlsx, 大小: 87594 bytes, 格式: .xlsx
+2026-05-11 10:46:57,758 - api.routers.memory - INFO - 数据形状: (500, 41), 开始逐行预测分析...
+2026-05-11 10:46:57,841 - api.routers.memory - INFO - 完成 200 条企业预测分析
+2026-05-11 10:47:06,780 - api.routers.memory - INFO - 开始导入文件: st_enterprise_rating_information_filling.xlsx, 大小: 204040 bytes, 格式: .xlsx
+2026-05-11 10:47:07,320 - api.routers.memory - INFO - 使用 openpyxl 引擎成功读取Excel文件
+2026-05-11 10:47:07,323 - api.routers.memory - INFO - 数据形状: (1374, 38), 列名: ['dms_timestamp', 'ID', 'ENTERPRISE_ID', 'PROVINCE', 'CITY']...
+2026-05-11 10:47:07,367 - api.routers.memory - INFO - 成功生成 501 条长期记忆条目
+2026-05-11 10:47:13,555 - iteration.monitor - INFO - 监控表已初始化
+2026-05-11 10:47:20,869 - iteration.monitor - INFO - 监控表已初始化
+2026-05-11 10:47:26,761 - iteration.monitor - INFO - 监控表已初始化
+2026-05-11 10:47:42,358 - iteration.monitor - INFO - 监控表已初始化
+2026-05-11 10:48:23,777 - api.routers.data - ERROR - 数据上传失败: API 数据加载失败: 'utf-8' codec can't decode byte 0xe6 in position 10: invalid continuation byte
+2026-05-11 10:48:25,026 - agent.workflow - INFO - Workflow 输入字段标准化完成: mapped=['企业名称->enterprise_name', '企业职工总人数->staff_num', '专职安全生产管理人员数->fulltime_safety_num', '兼职安全生产管理人员数->parttime_safety_num', '上一年经营收入->last_year_income', '固定资产->fixed_assets', '安全生产标准化建设情况->safety_build', '行业监管大类->supervision_large', '国民经济大类->indus_type_large', '是否发生事故->risk_accident_flag', '是否发现问题隐患 0-否 1-是->has_risk_item'] defaulted_count=49
+2026-05-11 10:48:25,087 - agent.workflow - ERROR - 风险评估失败: 模型推理失败: This LogisticRegression instance is not fitted yet. Call 'fit' with appropriate arguments before using this estimator.
+2026-05-11 10:48:25,096 - agent.workflow - INFO - Workflow 输入字段标准化完成: mapped=['企业名称->enterprise_name', '企业职工总人数->staff_num', '专职安全生产管理人员数->fulltime_safety_num', '兼职安全生产管理人员数->parttime_safety_num', '上一年经营收入->last_year_income', '固定资产->fixed_assets', '安全生产标准化建设情况->safety_build', '行业监管大类->supervision_large', '国民经济大类->indus_type_large', '是否发生事故->risk_accident_flag', '是否发现问题隐患 0-否 1-是->has_risk_item'] defaulted_count=49
+2026-05-11 10:48:25,147 - agent.workflow - ERROR - 风险评估失败: 模型推理失败: This LogisticRegression instance is not fitted yet. Call 'fit' with appropriate arguments before using this estimator.
+2026-05-11 10:48:25,148 - api.routers.prediction - WARNING - Workflow 返回结果不完整，降级至 Mock: 模型推理失败: This LogisticRegression instance is not fitted yet. Call 'fit' with appropriate arguments before using this estimator.
+2026-05-11 10:53:46,996 - api.routers.memory - INFO - 开始预测分析文件: st_enterprise_rating_information_filling.xlsx, 大小: 204040 bytes, 格式: .xlsx
+2026-05-11 10:53:47,184 - api.routers.memory - INFO - 数据形状: (1374, 38), 开始逐行预测分析...
+2026-05-11 10:53:47,271 - api.routers.memory - INFO - 完成 200 条企业预测分析
+2026-05-11 10:53:56,107 - api.routers.memory - INFO - 开始导入文件: szs_business_address.xlsx, 大小: 303778 bytes, 格式: .xlsx
+2026-05-11 10:53:56,292 - api.routers.memory - INFO - 使用 openpyxl 引擎成功读取Excel文件
+2026-05-11 10:53:56,295 - api.routers.memory - INFO - 数据形状: (2013, 20), 列名: ['dms_timestamp', 'CITY', 'ENTERPRISE_HISTORY_ID', 'COUNTY', 'REMARK']...
+2026-05-11 10:53:56,333 - api.routers.memory - INFO - 成功生成 501 条长期记忆条目
+2026-05-11 11:01:10,480 - agent.workflow - INFO - Workflow 输入字段标准化完成: mapped=['企业名称->enterprise_name', '企业职工总人数->staff_num', '专职安全生产管理人员数->fulltime_safety_num', '兼职安全生产管理人员数->parttime_safety_num', '上一年经营收入->last_year_income', '固定资产->fixed_assets', '安全生产标准化建设情况->safety_build', '行业监管大类->supervision_large', '国民经济大类->indus_type_large', '是否发生事故->risk_accident_flag', '是否发现问题隐患 0-否 1-是->has_risk_item'] defaulted_count=49
+2026-05-11 11:01:10,521 - agent.workflow - ERROR - 风险评估失败: 模型推理失败: This LogisticRegression instance is not fitted yet. Call 'fit' with appropriate arguments before using this estimator.
+2026-05-11 11:01:10,526 - agent.workflow - INFO - Workflow 输入字段标准化完成: mapped=['企业名称->enterprise_name', '企业职工总人数->staff_num', '专职安全生产管理人员数->fulltime_safety_num', '兼职安全生产管理人员数->parttime_safety_num', '上一年经营收入->last_year_income', '固定资产->fixed_assets', '安全生产标准化建设情况->safety_build', '行业监管大类->supervision_large', '国民经济大类->indus_type_large', '是否发生事故->risk_accident_flag', '是否发现问题隐患 0-否 1-是->has_risk_item'] defaulted_count=49
+2026-05-11 11:01:10,559 - agent.workflow - ERROR - 风险评估失败: 模型推理失败: This LogisticRegression instance is not fitted yet. Call 'fit' with appropriate arguments before using this estimator.
+2026-05-11 11:01:10,560 - api.routers.prediction - WARNING - Workflow 返回结果不完整，降级至 Mock: 模型推理失败: This LogisticRegression instance is not fitted yet. Call 'fit' with appropriate arguments before using this estimator.
+2026-05-11 11:01:14,573 - api.routers.data - ERROR - 数据上传失败: API 数据加载失败: 'utf-8' codec can't decode byte 0xbb in position 10: invalid start byte
+2026-05-11 11:05:02,944 - iteration.monitor - INFO - 监控表已初始化
+2026-05-11 11:05:14,281 - iteration.monitor - INFO - 监控表已初始化
+2026-05-11 11:17:57,768 - iteration.monitor - INFO - 监控表已初始化
+2026-05-11 11:28:15,338 - iteration.monitor - INFO - 监控表已初始化
+2026-05-11 11:28:17,058 - iteration.monitor - INFO - 监控表已初始化
+2026-05-11 11:32:21,454 - iteration.monitor - INFO - 监控表已初始化
+2026-05-11 11:32:33,205 - iteration.monitor - INFO - 监控表已初始化
+2026-05-11 11:33:42,858 - iteration.monitor - INFO - 监控表已初始化
+2026-05-11 11:35:58,513 - iteration.monitor - INFO - 监控表已初始化
+2026-05-11 11:35:59,142 - iteration.monitor - INFO - 监控表已初始化
+2026-05-11 11:35:59,785 - iteration.monitor - INFO - 监控表已初始化
+2026-05-11 11:36:01,517 - iteration.monitor - INFO - 监控表已初始化
+2026-05-11 11:47:07,904 - iteration.monitor - INFO - 监控表已初始化
+2026-05-11 11:57:47,726 - iteration.monitor - INFO - 监控表已初始化
+2026-05-11 12:05:57,939 - iteration.monitor - INFO - 监控表已初始化
+2026-05-11 12:29:32,199 - iteration.monitor - INFO - 监控表已初始化
+2026-05-11 12:29:33,952 - iteration.monitor - INFO - 监控表已初始化
+2026-05-11 12:30:02,057 - api.routers.memory - INFO - 开始导入文件: ds_aczf_penalty_disc_3_202603181745.csv, 大小: 134215 bytes, 格式: .csv
+2026-05-11 12:30:02,139 - api.routers.memory - INFO - 使用 gbk 编码成功读取CSV文件
+2026-05-11 12:30:02,141 - api.routers.memory - INFO - 数据形状: (300, 29), 列名: ['id', '案件id', '案件名称', '当事人', '案件承办人id']...
+2026-05-11 12:30:02,175 - api.routers.memory - INFO - 成功生成 301 条长期记忆条目
+2026-05-11 12:30:04,794 - api.routers.memory - INFO - 开始预测分析文件: ds_aczf_sys_user_3_202603181747.csv, 大小: 169041 bytes, 格式: .csv
+2026-05-11 12:30:04,807 - api.routers.memory - INFO - 数据形状: (300, 78), 开始逐行预测分析...
+2026-05-11 12:30:04,897 - api.routers.memory - INFO - 完成 200 条企业预测分析
+2026-05-11 12:30:10,578 - api.routers.memory - INFO - 开始导入文件: ds_aczf_penalty_simple_prob_3_202603181746.csv, 大小: 1693 bytes, 格式: .csv
+2026-05-11 12:30:10,582 - api.routers.memory - INFO - 使用 utf-8-sig 编码成功读取CSV文件
+2026-05-11 12:30:10,584 - api.routers.memory - INFO - 数据形状: (7, 12), 列名: ['问题id', '案件id', '检查项id', '检查来源 0-简易行政处罚  1-一般行政处罚', '来源的id']...
+2026-05-11 12:30:10,586 - api.routers.memory - INFO - 成功生成 8 条长期记忆条目
+2026-05-11 12:30:20,385 - iteration.monitor - INFO - 监控表已初始化
+2026-05-11 12:30:57,704 - iteration.monitor - INFO - 监控表已初始化
+2026-05-11 12:31:05,527 - api.routers.memory - INFO - 开始导入文件: ds_aczf_sys_dept_3_202603181747.csv, 大小: 169677 bytes, 格式: .csv
+2026-05-11 12:31:05,550 - api.routers.memory - INFO - 使用 utf-8-sig 编码成功读取CSV文件
+2026-05-11 12:31:05,551 - api.routers.memory - INFO - 数据形状: (294, 41), 列名: ['主键', '创建者', 'create_time', '更新者', 'update_time']...
+2026-05-11 12:31:05,579 - api.routers.memory - INFO - 成功生成 295 条长期记忆条目
+2026-05-11 12:31:54,338 - api.main - INFO - 应用关闭
+2026-05-11 12:42:51,550 - api.routers.memory - INFO - 自动保存线程已启动（每30秒）
+2026-05-11 12:42:51,553 - api.routers.memory - INFO - 持久化文件不存在 long_term.json，使用空数据
+2026-05-11 12:42:51,555 - api.routers.memory - INFO - 持久化文件不存在 short_term.json，使用空数据
+2026-05-11 12:42:51,558 - api.routers.memory - INFO - 持久化文件不存在 warning_experience.json，使用空数据
+2026-05-11 12:42:51,561 - api.routers.memory - INFO - 持久化文件不存在 iteration_history.json，使用空数据
+2026-05-11 12:42:51,567 - api.routers.memory - INFO - 持久化文件不存在 approval_store.json，使用空数据
+2026-05-11 12:42:51,573 - api.routers.memory - INFO - 持久化文件不存在 audit_log.json，使用空数据
+2026-05-11 12:42:51,574 - api.routers.memory - INFO - 持久化文件不存在 enterprise_risk_history.json，使用空数据
+2026-05-11 12:42:53,441 - api.main - INFO - mining_risk_agent v1.0.0 启动中...
+2026-05-11 12:43:46,223 - iteration.monitor - INFO - 监控表已初始化
+2026-05-11 12:44:46,261 - iteration.monitor - INFO - 监控表已初始化
+2026-05-11 12:46:21,339 - iteration.monitor - INFO - 监控表已初始化
+2026-05-11 12:46:32,899 - iteration.monitor - INFO - 监控表已初始化
+2026-05-11 12:46:35,043 - data.preprocessor - INFO - Pipeline 已从 models/preprocessing_pipeline.pkl 加载
+2026-05-11 12:46:35,045 - agent.workflow - INFO - Workflow 输入字段标准化完成: mapped=['企业名称->enterprise_name', '企业职工总人数->staff_num', '专职安全生产管理人员数->fulltime_safety_num', '兼职安全生产管理人员数->parttime_safety_num', '上一年经营收入->last_year_income', '固定资产->fixed_assets', '安全生产标准化建设情况->safety_build', '行业监管大类->supervision_large', '国民经济大类->indus_type_large', '是否发生事故->risk_accident_flag', '是否发现问题隐患 0-否 1-是->has_risk_item'] defaulted_count=49
+2026-05-11 12:46:35,134 - model.stacking - INFO - 基学习器 multinomial_lr (logistic_regression) 已初始化
+2026-05-11 12:46:35,138 - model.stacking - INFO - 基学习器 xgboost (xgboost) 已初始化
+2026-05-11 12:46:35,140 - model.stacking - INFO - 基学习器 lightgbm (lightgbm) 已初始化
+2026-05-11 12:46:35,142 - model.stacking - INFO - 基学习器 catboost (catboost) 已初始化
+2026-05-11 12:46:35,145 - model.stacking - INFO - 基学习器 random_forest (random_forest) 已初始化
+2026-05-11 12:46:35,148 - model.stacking - INFO - 元学习器已初始化
+2026-05-11 12:46:35,269 - agent.workflow - ERROR - 风险评估失败: <class 'keras.src.models.functional.Functional'> could not be deserialized properly. Please ensure that components that are Python object instances (layers, models, etc.) returned by `get_config()` are explicitly deserialized in the model's `from_config()` method.
+
+config={'module': 'keras.src.models.functional', 'class_name': 'Functional', 'config': {}, 'registered_name': 'Functional', 'build_config': {'input_shape': None}, 'compile_config': {'optimizer': {'module': 'keras.optimizers', 'class_name': 'Adam', 'config': {'name': 'adam', 'learning_rate': 0.0010000000474974513, 'weight_decay': None, 'clipnorm': None, 'global_clipnorm': None, 'clipvalue': None, 'use_ema': False, 'ema_momentum': 0.99, 'ema_overwrite_frequency': None, 'loss_scale_factor': None, 'gradient_accumulation_steps': None, 'beta_1': 0.9, 'beta_2': 0.999, 'epsilon': 1e-07, 'amsgrad': False}, 'registered_name': None}, 'loss': 'sparse_categorical_crossentropy', 'loss_weights': None, 'metrics': ['accuracy'], 'weighted_metrics': None, 'run_eagerly': False, 'steps_per_execution': 1, 'jit_compile': False}}.
+
+Exception encountered: <class 'keras.src.layers.core.dense.Dense'> could not be deserialized properly. Please ensure that components that are Python object instances (layers, models, etc.) returned by `get_config()` are explicitly deserialized in the model's `from_config()` method.
+
+config={'module': 'keras.layers', 'class_name': 'Dense', 'config': {'name': 'dense', 'trainable': True, 'dtype': {'module': 'keras', 'class_name': 'DTypePolicy', 'config': {'name': 'float32'}, 'registered_name': None}, 'units': 128, 'activation': 'relu', 'use_bias': True, 'kernel_initializer': {'module': 'keras.initializers', 'class_name': 'GlorotUniform', 'config': {'seed': None}, 'registered_name': None}, 'bias_initializer': {'module': 'keras.initializers', 'class_name': 'Zeros', 'config': {}, 'registered_name': None}, 'kernel_regularizer': None, 'bias_regularizer': None, 'kernel_constraint': None, 'bias_constraint': None, 'quantization_config': None}, 'registered_name': None, 'build_config': {'input_shape': [None, 19]}, 'name': 'dense', 'inbound_nodes': [{'args': [{'class_name': '__keras_tensor__', 'config': {'shape': [None, 19], 'dtype': 'float32', 'keras_history': ['input_layer', 0, 0]}}], 'kwargs': {}}]}.
+
+Exception encountered: Error when deserializing class 'Dense' using config={'name': 'dense', 'trainable': True, 'dtype': 'float32', 'units': 128, 'activation': 'relu', 'use_bias': True, 'kernel_initializer': {'module': 'keras.initializers', 'class_name': 'GlorotUniform', 'config': {'seed': None}, 'registered_name': None}, 'bias_initializer': {'module': 'keras.initializers', 'class_name': 'Zeros', 'config': {}, 'registered_name': None}, 'kernel_regularizer': None, 'bias_regularizer': None, 'kernel_constraint': None, 'bias_constraint': None, 'quantization_config': None}.
+
+Exception encountered: Unrecognized keyword arguments passed to Dense: {'quantization_config': None}
+2026-05-11 12:46:35,303 - agent.workflow - INFO - Workflow 输入字段标准化完成: mapped=['企业名称->enterprise_name', '企业职工总人数->staff_num', '专职安全生产管理人员数->fulltime_safety_num', '兼职安全生产管理人员数->parttime_safety_num', '上一年经营收入->last_year_income', '固定资产->fixed_assets', '安全生产标准化建设情况->safety_build', '行业监管大类->supervision_large', '国民经济大类->indus_type_large', '是否发生事故->risk_accident_flag', '是否发现问题隐患 0-否 1-是->has_risk_item'] defaulted_count=49
+2026-05-11 12:46:35,351 - agent.workflow - ERROR - 风险评估失败: 模型推理失败: This LogisticRegression instance is not fitted yet. Call 'fit' with appropriate arguments before using this estimator.
+2026-05-11 12:46:35,353 - api.routers.prediction - WARNING - Workflow 返回结果不完整，降级至 Mock: 模型推理失败: This LogisticRegression instance is not fitted yet. Call 'fit' with appropriate arguments before using this estimator.
+2026-05-11 12:47:17,848 - iteration.monitor - INFO - 监控表已初始化
+2026-05-11 12:47:23,431 - api.routers.data - ERROR - 数据上传失败: API 数据加载失败: 'utf-8' codec can't decode byte 0xc1 in position 226: invalid start byte
+2026-05-11 12:47:24,846 - agent.workflow - INFO - Workflow 输入字段标准化完成: mapped=['企业名称->enterprise_name', '企业职工总人数->staff_num', '专职安全生产管理人员数->fulltime_safety_num', '兼职安全生产管理人员数->parttime_safety_num', '上一年经营收入->last_year_income', '固定资产->fixed_assets', '安全生产标准化建设情况->safety_build', '行业监管大类->supervision_large', '国民经济大类->indus_type_large', '是否发生事故->risk_accident_flag', '是否发现问题隐患 0-否 1-是->has_risk_item'] defaulted_count=49
+2026-05-11 12:47:24,888 - agent.workflow - ERROR - 风险评估失败: 模型推理失败: This LogisticRegression instance is not fitted yet. Call 'fit' with appropriate arguments before using this estimator.
+2026-05-11 12:47:24,901 - agent.workflow - INFO - Workflow 输入字段标准化完成: mapped=['企业名称->enterprise_name', '企业职工总人数->staff_num', '专职安全生产管理人员数->fulltime_safety_num', '兼职安全生产管理人员数->parttime_safety_num', '上一年经营收入->last_year_income', '固定资产->fixed_assets', '安全生产标准化建设情况->safety_build', '行业监管大类->supervision_large', '国民经济大类->indus_type_large', '是否发生事故->risk_accident_flag', '是否发现问题隐患 0-否 1-是->has_risk_item'] defaulted_count=49
+2026-05-11 12:47:24,944 - agent.workflow - ERROR - 风险评估失败: 模型推理失败: This LogisticRegression instance is not fitted yet. Call 'fit' with appropriate arguments before using this estimator.
+2026-05-11 12:47:24,950 - api.routers.prediction - WARNING - Workflow 返回结果不完整，降级至 Mock: 模型推理失败: This LogisticRegression instance is not fitted yet. Call 'fit' with appropriate arguments before using this estimator.
+2026-05-11 12:47:28,053 - iteration.monitor - INFO - 监控表已初始化
+2026-05-11 13:01:55,820 - api.main - INFO - 应用关闭
+2026-05-11 13:02:10,572 - api.routers.memory - INFO - 自动保存线程已启动（每30秒）
+2026-05-11 13:02:10,578 - api.routers.memory - INFO - 加载 long_term 成功: 0 条
+2026-05-11 13:02:10,582 - api.routers.memory - INFO - 加载 short_term 成功: 0 条
+2026-05-11 13:02:10,586 - api.routers.memory - INFO - 加载 warning_experience 成功: 0 条
+2026-05-11 13:02:10,592 - api.routers.memory - INFO - 加载 iteration_history 成功: 0 条
+2026-05-11 13:02:10,596 - api.routers.memory - INFO - 加载 approval_store 成功: 0 条
+2026-05-11 13:02:10,599 - api.routers.memory - INFO - 加载 audit_log 成功: 0 条
+2026-05-11 13:02:10,602 - api.routers.memory - INFO - 加载 enterprise_risk_history 成功: 0 条
+2026-05-11 13:02:12,323 - api.main - INFO - mining_risk_agent v1.0.0 启动中...
+2026-05-11 13:02:21,037 - iteration.monitor - INFO - 监控表已初始化
+2026-05-11 13:03:20,638 - api.main - INFO - 应用关闭
+2026-05-11 13:03:31,122 - api.routers.memory - INFO - 自动保存线程已启动（每30秒）
+2026-05-11 13:03:31,137 - api.routers.memory - INFO - 加载 long_term 成功: 0 条
+2026-05-11 13:03:31,146 - api.routers.memory - INFO - 加载 short_term 成功: 0 条
+2026-05-11 13:03:31,153 - api.routers.memory - INFO - 加载 warning_experience 成功: 0 条
+2026-05-11 13:03:31,161 - api.routers.memory - INFO - 加载 iteration_history 成功: 0 条
+2026-05-11 13:03:31,167 - api.routers.memory - INFO - 加载 approval_store 成功: 0 条
+2026-05-11 13:03:31,175 - api.routers.memory - INFO - 加载 audit_log 成功: 0 条
+2026-05-11 13:03:31,182 - api.routers.memory - INFO - 加载 enterprise_risk_history 成功: 0 条
+2026-05-11 13:03:32,496 - api.main - INFO - mining_risk_agent v1.0.0 启动中...
+2026-05-11 13:03:38,763 - iteration.monitor - INFO - 监控表已初始化
+2026-05-11 13:03:40,371 - iteration.monitor - INFO - 监控表已初始化
+2026-05-11 13:03:54,016 - iteration.monitor - INFO - 监控表已初始化
+2026-05-11 13:09:28,893 - api.main - INFO - 应用关闭
+2026-05-11 13:09:39,686 - api.routers.memory - INFO - 自动保存线程已启动（每30秒）
+2026-05-11 13:09:39,692 - api.routers.memory - INFO - 加载 long_term 成功: 0 条
+2026-05-11 13:09:39,699 - api.routers.memory - INFO - 加载 short_term 成功: 0 条
+2026-05-11 13:09:39,703 - api.routers.memory - INFO - 加载 warning_experience 成功: 0 条
+2026-05-11 13:09:39,710 - api.routers.memory - INFO - 加载 iteration_history 成功: 0 条
+2026-05-11 13:09:39,715 - api.routers.memory - INFO - 加载 approval_store 成功: 0 条
+2026-05-11 13:09:39,720 - api.routers.memory - INFO - 加载 audit_log 成功: 0 条
+2026-05-11 13:09:39,726 - api.routers.memory - INFO - 加载 enterprise_risk_history 成功: 0 条
+2026-05-11 13:09:40,958 - api.main - INFO - mining_risk_agent v1.0.0 启动中...
+2026-05-11 13:09:48,417 - iteration.monitor - INFO - 监控表已初始化
+2026-05-11 13:09:51,101 - iteration.monitor - INFO - 监控表已初始化
+2026-05-11 13:10:10,615 - api.routers.memory - INFO - 持久化 long_term 成功: 20025 条
+2026-05-11 13:10:10,630 - api.routers.memory - INFO - 持久化 audit_log 成功: 1 条
+2026-05-11 13:10:15,865 - api.routers.memory - INFO - 持久化 short_term 成功: 8380 条
+2026-05-11 13:10:19,285 - api.routers.memory - INFO - 持久化 long_term 成功: 28405 条
+2026-05-11 13:10:19,957 - api.routers.memory - INFO - 持久化 warning_experience 成功: 8380 条
+2026-05-11 13:10:20,435 - api.routers.memory - INFO - 持久化 enterprise_risk_history 成功: 8380 条
+2026-05-11 13:10:20,448 - api.routers.memory - INFO - 持久化 audit_log 成功: 2 条
+2026-05-11 13:10:32,535 - api.routers.memory - INFO - 开始预测分析文件: ds_aczf_penalty_disc_3_202603181745.csv, 大小: 134215 bytes, 格式: .csv
+2026-05-11 13:10:32,961 - api.routers.memory - INFO - 持久化 short_term 成功: 8580 条
+2026-05-11 13:10:36,592 - api.routers.memory - INFO - 持久化 long_term 成功: 28906 条
+2026-05-11 13:10:37,672 - api.routers.memory - INFO - 持久化 warning_experience 成功: 8580 条
+2026-05-11 13:10:38,100 - api.routers.memory - INFO - 持久化 enterprise_risk_history 成功: 8580 条
+2026-05-11 13:10:38,107 - api.routers.memory - INFO - 持久化 audit_log 成功: 3 条
+2026-05-11 13:10:42,552 - api.routers.memory - INFO - 开始导入文件: ds_aczf_penalty_simple_prob_3_202603181746.csv, 大小: 1693 bytes, 格式: .csv
+2026-05-11 13:10:46,478 - api.routers.memory - INFO - 持久化 long_term 成功: 28914 条
+2026-05-11 13:10:46,570 - api.routers.memory - INFO - 持久化 audit_log 成功: 4 条
+2026-05-11 13:11:05,905 - iteration.monitor - INFO - 监控表已初始化
+2026-05-11 13:11:34,351 - api.routers.memory - INFO - 持久化 iteration_history 成功: 5 条
+2026-05-11 13:11:53,123 - iteration.monitor - INFO - 监控表已初始化
+2026-05-11 13:11:57,244 - data.preprocessor - INFO - Pipeline 已从 models/preprocessing_pipeline.pkl 加载
+2026-05-11 13:11:57,245 - agent.workflow - INFO - Workflow 输入字段标准化完成: mapped=['企业名称->enterprise_name', '企业职工总人数->staff_num', '专职安全生产管理人员数->fulltime_safety_num', '兼职安全生产管理人员数->parttime_safety_num', '上一年经营收入->last_year_income', '固定资产->fixed_assets', '安全生产标准化建设情况->safety_build', '行业监管大类->supervision_large', '国民经济大类->indus_type_large', '是否发生事故->risk_accident_flag', '是否发现问题隐患 0-否 1-是->has_risk_item'] defaulted_count=49
+2026-05-11 13:11:57,284 - model.stacking - INFO - 基学习器 multinomial_lr (logistic_regression) 已初始化
+2026-05-11 13:11:57,285 - model.stacking - INFO - 基学习器 xgboost (xgboost) 已初始化
+2026-05-11 13:11:57,286 - model.stacking - INFO - 基学习器 lightgbm (lightgbm) 已初始化
+2026-05-11 13:11:57,287 - model.stacking - INFO - 基学习器 catboost (catboost) 已初始化
+2026-05-11 13:11:57,291 - model.stacking - INFO - 基学习器 random_forest (random_forest) 已初始化
+2026-05-11 13:11:57,292 - model.stacking - INFO - 元学习器已初始化
+2026-05-11 13:11:57,362 - agent.workflow - ERROR - 风险评估失败: <class 'keras.src.models.functional.Functional'> could not be deserialized properly. Please ensure that components that are Python object instances (layers, models, etc.) returned by `get_config()` are explicitly deserialized in the model's `from_config()` method.
+
+config={'module': 'keras.src.models.functional', 'class_name': 'Functional', 'config': {}, 'registered_name': 'Functional', 'build_config': {'input_shape': None}, 'compile_config': {'optimizer': {'module': 'keras.optimizers', 'class_name': 'Adam', 'config': {'name': 'adam', 'learning_rate': 0.0010000000474974513, 'weight_decay': None, 'clipnorm': None, 'global_clipnorm': None, 'clipvalue': None, 'use_ema': False, 'ema_momentum': 0.99, 'ema_overwrite_frequency': None, 'loss_scale_factor': None, 'gradient_accumulation_steps': None, 'beta_1': 0.9, 'beta_2': 0.999, 'epsilon': 1e-07, 'amsgrad': False}, 'registered_name': None}, 'loss': 'sparse_categorical_crossentropy', 'loss_weights': None, 'metrics': ['accuracy'], 'weighted_metrics': None, 'run_eagerly': False, 'steps_per_execution': 1, 'jit_compile': False}}.
+
+Exception encountered: <class 'keras.src.layers.core.dense.Dense'> could not be deserialized properly. Please ensure that components that are Python object instances (layers, models, etc.) returned by `get_config()` are explicitly deserialized in the model's `from_config()` method.
+
+config={'module': 'keras.layers', 'class_name': 'Dense', 'config': {'name': 'dense', 'trainable': True, 'dtype': {'module': 'keras', 'class_name': 'DTypePolicy', 'config': {'name': 'float32'}, 'registered_name': None}, 'units': 128, 'activation': 'relu', 'use_bias': True, 'kernel_initializer': {'module': 'keras.initializers', 'class_name': 'GlorotUniform', 'config': {'seed': None}, 'registered_name': None}, 'bias_initializer': {'module': 'keras.initializers', 'class_name': 'Zeros', 'config': {}, 'registered_name': None}, 'kernel_regularizer': None, 'bias_regularizer': None, 'kernel_constraint': None, 'bias_constraint': None, 'quantization_config': None}, 'registered_name': None, 'build_config': {'input_shape': [None, 19]}, 'name': 'dense', 'inbound_nodes': [{'args': [{'class_name': '__keras_tensor__', 'config': {'shape': [None, 19], 'dtype': 'float32', 'keras_history': ['input_layer', 0, 0]}}], 'kwargs': {}}]}.
+
+Exception encountered: Error when deserializing class 'Dense' using config={'name': 'dense', 'trainable': True, 'dtype': 'float32', 'units': 128, 'activation': 'relu', 'use_bias': True, 'kernel_initializer': {'module': 'keras.initializers', 'class_name': 'GlorotUniform', 'config': {'seed': None}, 'registered_name': None}, 'bias_initializer': {'module': 'keras.initializers', 'class_name': 'Zeros', 'config': {}, 'registered_name': None}, 'kernel_regularizer': None, 'bias_regularizer': None, 'kernel_constraint': None, 'bias_constraint': None, 'quantization_config': None}.
+
+Exception encountered: Unrecognized keyword arguments passed to Dense: {'quantization_config': None}
+2026-05-11 13:11:57,375 - agent.workflow - INFO - Workflow 输入字段标准化完成: mapped=['企业名称->enterprise_name', '企业职工总人数->staff_num', '专职安全生产管理人员数->fulltime_safety_num', '兼职安全生产管理人员数->parttime_safety_num', '上一年经营收入->last_year_income', '固定资产->fixed_assets', '安全生产标准化建设情况->safety_build', '行业监管大类->supervision_large', '国民经济大类->indus_type_large', '是否发生事故->risk_accident_flag', '是否发现问题隐患 0-否 1-是->has_risk_item'] defaulted_count=49
+2026-05-11 13:11:57,412 - agent.workflow - ERROR - 风险评估失败: 模型推理失败: This LogisticRegression instance is not fitted yet. Call 'fit' with appropriate arguments before using this estimator.
+2026-05-11 13:11:57,414 - api.routers.prediction - WARNING - Workflow 返回结果不完整，降级至 Mock: 模型推理失败: This LogisticRegression instance is not fitted yet. Call 'fit' with appropriate arguments before using this estimator.
+2026-05-11 13:12:59,491 - api.routers.memory - INFO - 开始预测分析文件: ds_aczf_accessory_3_202603181744.csv, 大小: 75414 bytes, 格式: .csv
+2026-05-11 13:12:59,959 - api.routers.memory - INFO - 持久化 short_term 成功: 8780 条
+2026-05-11 13:13:03,398 - api.routers.memory - INFO - 持久化 long_term 成功: 29415 条
+2026-05-11 13:13:04,203 - api.routers.memory - INFO - 持久化 warning_experience 成功: 8780 条
+2026-05-11 13:13:04,636 - api.routers.memory - INFO - 持久化 enterprise_risk_history 成功: 8580 条
+2026-05-11 13:13:04,646 - api.routers.memory - INFO - 持久化 audit_log 成功: 5 条
+2026-05-11 13:13:19,847 - api.routers.memory - INFO - 开始导入文件: ds_aczf_penalty_simple_prob_3_202603181746.csv, 大小: 1693 bytes, 格式: .csv
+2026-05-11 13:13:23,418 - api.routers.memory - INFO - 持久化 long_term 成功: 29423 条
+2026-05-11 13:13:23,442 - api.routers.memory - INFO - 持久化 audit_log 成功: 6 条
+2026-05-11 13:13:27,637 - api.routers.memory - INFO - 开始导入文件: ds_aczf_accessory_3_202603181744.csv, 大小: 75414 bytes, 格式: .csv
+2026-05-11 13:13:31,026 - api.routers.memory - INFO - 持久化 long_term 成功: 29724 条
+2026-05-11 13:13:31,050 - api.routers.memory - INFO - 持久化 audit_log 成功: 7 条
+2026-05-11 13:13:47,227 - agent.workflow - INFO - Workflow 输入字段标准化完成: mapped=['企业名称->enterprise_name', '企业职工总人数->staff_num', '专职安全生产管理人员数->fulltime_safety_num', '兼职安全生产管理人员数->parttime_safety_num', '上一年经营收入->last_year_income', '固定资产->fixed_assets', '安全生产标准化建设情况->safety_build', '行业监管大类->supervision_large', '国民经济大类->indus_type_large', '是否发生事故->risk_accident_flag', '是否发现问题隐患 0-否 1-是->has_risk_item'] defaulted_count=49
+2026-05-11 13:13:47,267 - agent.workflow - ERROR - 风险评估失败: 模型推理失败: This LogisticRegression instance is not fitted yet. Call 'fit' with appropriate arguments before using this estimator.
+2026-05-11 13:13:47,273 - agent.workflow - INFO - Workflow 输入字段标准化完成: mapped=['企业名称->enterprise_name', '企业职工总人数->staff_num', '专职安全生产管理人员数->fulltime_safety_num', '兼职安全生产管理人员数->parttime_safety_num', '上一年经营收入->last_year_income', '固定资产->fixed_assets', '安全生产标准化建设情况->safety_build', '行业监管大类->supervision_large', '国民经济大类->indus_type_large', '是否发生事故->risk_accident_flag', '是否发现问题隐患 0-否 1-是->has_risk_item'] defaulted_count=49
+2026-05-11 13:13:47,305 - agent.workflow - ERROR - 风险评估失败: 模型推理失败: This LogisticRegression instance is not fitted yet. Call 'fit' with appropriate arguments before using this estimator.
+2026-05-11 13:13:47,308 - api.routers.prediction - WARNING - Workflow 返回结果不完整，降级至 Mock: 模型推理失败: This LogisticRegression instance is not fitted yet. Call 'fit' with appropriate arguments before using this estimator.
+2026-05-11 13:14:11,464 - api.routers.memory - INFO - 持久化 long_term 成功: 49749 条
+2026-05-11 13:14:11,491 - api.routers.memory - INFO - 持久化 audit_log 成功: 8 条
+2026-05-11 13:14:23,828 - api.routers.memory - INFO - 持久化 short_term 成功: 17160 条
+2026-05-11 13:14:31,042 - api.routers.memory - INFO - 持久化 long_term 成功: 58129 条
+2026-05-11 13:14:32,650 - api.routers.memory - INFO - 持久化 warning_experience 成功: 17160 条
+2026-05-11 13:14:33,541 - api.routers.memory - INFO - 持久化 enterprise_risk_history 成功: 8580 条
+2026-05-11 13:14:33,558 - api.routers.memory - INFO - 持久化 audit_log 成功: 9 条
+2026-05-11 13:14:50,369 - api.routers.memory - INFO - 开始预测分析文件: ds_aczf_penalty_simple_prob_3_202603181746.csv, 大小: 1693 bytes, 格式: .csv
+2026-05-11 13:14:51,079 - api.routers.memory - INFO - 持久化 short_term 成功: 17167 条
+2026-05-11 13:14:59,325 - api.routers.memory - INFO - 持久化 long_term 成功: 58144 条
+2026-05-11 13:15:01,147 - api.routers.memory - INFO - 持久化 warning_experience 成功: 17167 条
+2026-05-11 13:15:02,160 - api.routers.memory - INFO - 持久化 enterprise_risk_history 成功: 8580 条
+2026-05-11 13:15:02,178 - api.routers.memory - INFO - 持久化 audit_log 成功: 10 条
+2026-05-11 13:15:11,567 - api.routers.memory - INFO - 开始导入文件: ds_aczf_penalty_simple_prob_3_202603181746.csv, 大小: 1693 bytes, 格式: .csv
+2026-05-11 13:15:18,885 - api.routers.memory - INFO - 持久化 long_term 成功: 58152 条
+2026-05-11 13:15:18,927 - api.routers.memory - INFO - 持久化 audit_log 成功: 11 条
+2026-05-11 13:16:47,488 - api.routers.memory - INFO - 开始预测分析文件: ds_aczf_penalty_illage_3_202603181746.csv, 大小: 135112 bytes, 格式: .csv
+2026-05-11 13:16:48,195 - api.routers.memory - INFO - 持久化 short_term 成功: 17367 条
+2026-05-11 13:16:54,541 - api.routers.memory - INFO - 持久化 long_term 成功: 58654 条
+2026-05-11 13:16:56,050 - api.routers.memory - INFO - 持久化 warning_experience 成功: 17367 条
+2026-05-11 13:16:56,852 - api.routers.memory - INFO - 持久化 enterprise_risk_history 成功: 8580 条
+2026-05-11 13:16:56,872 - api.routers.memory - INFO - 持久化 audit_log 成功: 12 条
+2026-05-11 13:17:58,377 - iteration.monitor - INFO - 监控表已初始化
+2026-05-11 13:18:22,263 - iteration.monitor - INFO - 监控表已初始化
+2026-05-11 13:18:35,518 - iteration.monitor - INFO - 监控表已初始化
+2026-05-11 13:18:52,984 - iteration.monitor - INFO - 监控表已初始化
+2026-05-11 13:19:04,037 - iteration.monitor - INFO - 监控表已初始化
+2026-05-11 13:20:26,076 - agent.workflow - INFO - Workflow 输入字段标准化完成: mapped=['企业名称->enterprise_name', '企业职工总人数->staff_num', '专职安全生产管理人员数->fulltime_safety_num', '兼职安全生产管理人员数->parttime_safety_num', '上一年经营收入->last_year_income', '固定资产->fixed_assets', '安全生产标准化建设情况->safety_build', '行业监管大类->supervision_large', '国民经济大类->indus_type_large', '是否发生事故->risk_accident_flag', '是否发现问题隐患 0-否 1-是->has_risk_item'] defaulted_count=49
+2026-05-11 13:20:26,118 - agent.workflow - ERROR - 风险评估失败: 模型推理失败: This LogisticRegression instance is not fitted yet. Call 'fit' with appropriate arguments before using this estimator.
+2026-05-11 13:20:26,127 - agent.workflow - INFO - Workflow 输入字段标准化完成: mapped=['企业名称->enterprise_name', '企业职工总人数->staff_num', '专职安全生产管理人员数->fulltime_safety_num', '兼职安全生产管理人员数->parttime_safety_num', '上一年经营收入->last_year_income', '固定资产->fixed_assets', '安全生产标准化建设情况->safety_build', '行业监管大类->supervision_large', '国民经济大类->indus_type_large', '是否发生事故->risk_accident_flag', '是否发现问题隐患 0-否 1-是->has_risk_item'] defaulted_count=49
+2026-05-11 13:20:26,163 - agent.workflow - ERROR - 风险评估失败: 模型推理失败: This LogisticRegression instance is not fitted yet. Call 'fit' with appropriate arguments before using this estimator.
+2026-05-11 13:20:26,165 - api.routers.prediction - WARNING - Workflow 返回结果不完整，降级至 Mock: 模型推理失败: This LogisticRegression instance is not fitted yet. Call 'fit' with appropriate arguments before using this estimator.
+2026-05-11 13:21:44,991 - api.routers.memory - INFO - 持久化 short_term 成功: 25747 条
+2026-05-11 13:21:54,476 - api.routers.memory - INFO - 持久化 long_term 成功: 67034 条
+2026-05-11 13:21:56,644 - api.routers.memory - INFO - 持久化 warning_experience 成功: 25747 条
+2026-05-11 13:21:57,872 - api.routers.memory - INFO - 持久化 enterprise_risk_history 成功: 8580 条
+2026-05-11 13:21:57,885 - api.routers.memory - INFO - 持久化 audit_log 成功: 13 条
+2026-05-11 13:22:01,112 - api.routers.memory - INFO - 开始导入文件: ds_aczf_sys_user_3_202603181747.csv, 大小: 169041 bytes, 格式: .csv
+2026-05-11 13:22:09,549 - api.routers.memory - INFO - 持久化 long_term 成功: 67335 条
+2026-05-11 13:22:09,588 - api.routers.memory - INFO - 持久化 audit_log 成功: 14 条
+2026-05-11 13:22:34,279 - api.routers.memory - INFO - 开始导入文件: ds_aczf_writ_detail_3_202603181755.csv, 大小: 87010 bytes, 格式: .csv
+2026-05-11 13:22:42,356 - api.routers.memory - INFO - 持久化 long_term 成功: 67636 条
+2026-05-11 13:22:42,415 - api.routers.memory - INFO - 持久化 audit_log 成功: 15 条
+2026-05-11 13:22:58,144 - agent.workflow - INFO - Workflow 输入字段标准化完成: mapped=['企业名称->enterprise_name', '企业职工总人数->staff_num', '专职安全生产管理人员数->fulltime_safety_num', '兼职安全生产管理人员数->parttime_safety_num', '上一年经营收入->last_year_income', '固定资产->fixed_assets', '安全生产标准化建设情况->safety_build', '行业监管大类->supervision_large', '国民经济大类->indus_type_large', '是否发生事故->risk_accident_flag', '是否发现问题隐患 0-否 1-是->has_risk_item'] defaulted_count=49
+2026-05-11 13:22:58,269 - agent.workflow - ERROR - 风险评估失败: 模型推理失败: This LogisticRegression instance is not fitted yet. Call 'fit' with appropriate arguments before using this estimator.
+2026-05-11 13:22:58,280 - agent.workflow - INFO - Workflow 输入字段标准化完成: mapped=['企业名称->enterprise_name', '企业职工总人数->staff_num', '专职安全生产管理人员数->fulltime_safety_num', '兼职安全生产管理人员数->parttime_safety_num', '上一年经营收入->last_year_income', '固定资产->fixed_assets', '安全生产标准化建设情况->safety_build', '行业监管大类->supervision_large', '国民经济大类->indus_type_large', '是否发生事故->risk_accident_flag', '是否发现问题隐患 0-否 1-是->has_risk_item'] defaulted_count=49
+2026-05-11 13:22:58,318 - agent.workflow - ERROR - 风险评估失败: 模型推理失败: This LogisticRegression instance is not fitted yet. Call 'fit' with appropriate arguments before using this estimator.
+2026-05-11 13:22:58,321 - api.routers.prediction - WARNING - Workflow 返回结果不完整，降级至 Mock: 模型推理失败: This LogisticRegression instance is not fitted yet. Call 'fit' with appropriate arguments before using this estimator.
+2026-05-11 13:23:25,086 - api.routers.memory - INFO - 持久化 long_term 成功: 87661 条
+2026-05-11 13:23:25,159 - api.routers.memory - INFO - 持久化 audit_log 成功: 16 条
+2026-05-11 13:23:30,386 - api.routers.memory - INFO - 持久化 short_term 成功: 34127 条
+2026-05-11 13:23:42,440 - api.routers.memory - INFO - 持久化 long_term 成功: 96041 条
+2026-05-11 13:23:45,874 - api.routers.memory - INFO - 持久化 warning_experience 成功: 34127 条
+2026-05-11 13:23:47,650 - api.routers.memory - INFO - 持久化 enterprise_risk_history 成功: 8580 条
+2026-05-11 13:23:47,669 - api.routers.memory - INFO - 持久化 audit_log 成功: 17 条
+2026-05-11 13:25:36,987 - api.routers.memory - INFO - 开始预测分析文件: ds_aczf_penalty_disc_3_202603181745.csv, 大小: 134215 bytes, 格式: .csv
+2026-05-11 13:25:39,283 - api.routers.memory - INFO - 持久化 short_term 成功: 34327 条
+2026-05-11 13:26:03,969 - api.routers.memory - INFO - 持久化 long_term 成功: 96542 条
+2026-05-11 13:26:08,234 - api.routers.memory - INFO - 持久化 warning_experience 成功: 34327 条
+2026-05-11 13:26:10,165 - api.routers.memory - INFO - 持久化 enterprise_risk_history 成功: 8580 条
+2026-05-11 13:26:10,182 - api.routers.memory - INFO - 持久化 audit_log 成功: 18 条

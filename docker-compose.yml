@@ -10,13 +10,10 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        # 默认使用部署推理依赖：API 基础包 + 当前 pkl 推理必需 ML 包。
-        # 如需训练/RAG/旧 Streamlit，可改为 requirements-full.txt。
         REQUIREMENTS_FILE: ${API_REQUIREMENTS_FILE:-requirements-deploy.txt}
     image: mining-risk-agent-api:latest
     container_name: mining_risk_api
     ports:
-      # 仅绑定本机，生产环境应只经前端/外层反向代理访问。
       - "127.0.0.1:8000:8000"
     volumes:
       - ./data:/app/data
@@ -24,6 +21,10 @@ services:
       - ./logs:/app/logs
       - ./knowledge_base:/app/knowledge_base
       - ./memory:/app/memory
+      - ./new_data:/app/new_data
+      - ./api:/app/api
+      - ./utils:/app/utils
+      - ./config.yaml:/app/config.yaml
     environment:
       PYTHONPATH: /app
       PYTHONUNBUFFERED: "1"
@@ -73,7 +74,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost/ >/dev/null 2>&1 || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/ >/dev/null 2>&1 || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 3

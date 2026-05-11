@@ -11,7 +11,7 @@ from fastapi import FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-from api.routers import audit, data, iteration, knowledge, prediction
+from api.routers import audit, data, iteration, knowledge, memory, prediction
 from api.routers.prediction import agent_router
 from utils.config import get_config
 from utils.logger import get_logger
@@ -63,6 +63,7 @@ def create_app() -> FastAPI:
     app.include_router(audit.router, prefix="/api/v1/audit", tags=["审计日志"])
     app.include_router(agent_router, prefix="/api/v1/agent", tags=["决策智能体"])
     app.include_router(iteration.router, prefix="/api/v1/iteration", tags=["模型迭代"])
+    app.include_router(memory.router, prefix="/api/v1/memory", tags=["记忆库管理"])
     
     @app.get("/health")
     async def health_check() -> Dict[str, str]:

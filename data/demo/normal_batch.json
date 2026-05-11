@@ -1,0 +1,37 @@
+{
+  "metadata": {
+    "batch_id": "normal_batch",
+    "sample_count": 1800,
+    "risk_sample_count": 420,
+    "recent_f1": 0.912,
+    "description": "正常新增批次，风险样本和近期 F1 均未触发重训阈值。",
+    "scenario": "NORMAL_BATCH",
+    "tags": ["normal", "no_retrain"]
+  },
+  "gates": {
+    "regression": {
+      "status": "PASS",
+      "baseline_f1": 0.904,
+      "candidate_f1": 0.909
+    },
+    "drift": {
+      "risk_level": "LOW",
+      "psi": 0.08,
+      "threshold": 0.25
+    }
+  },
+  "records": [
+    {
+      "enterprise_id": "DEMO-NORMAL-001",
+      "risk_level": "yellow",
+      "risk_items": 3,
+      "unrectified_troubles": 0
+    },
+    {
+      "enterprise_id": "DEMO-NORMAL-002",
+      "risk_level": "blue",
+      "risk_items": 1,
+      "unrectified_troubles": 0
+    }
+  ]
+}
