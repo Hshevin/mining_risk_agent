@@ -1,19 +1,7 @@
-import {
-  apiBase,
-  fetchHealth,
-  fetchLLMConfig,
-  switchLLMProvider,
-  updateLLMConfig,
-} from "../api/client";
-import { SCENARIO_CONFIG } from "../data/demoData";
-import type {
-  HealthResponse,
-  LLMConfigResponse,
-  LLMProvider,
-  LLMUpdateRequest,
-  ScenarioId,
-} from "../api/types";
-import { useEffect, useState } from "react";
+import { apiBase, fetchHealth } from "../api/client";
+import { SCENARIO_CONFIG, SCENARIO_NAMES } from "../data/demoData";
+import type { HealthResponse, ScenarioId } from "../api/types";
+import { useEffect, useMemo, useState } from "react";
 import JsonView from "../components/JsonView";
 
 interface Props {
@@ -21,356 +9,312 @@ interface Props {
   health: HealthResponse | null;
 }
 
-type LLMFormState = Required<
-  Pick<
-    LLMUpdateRequest,
-    | "provider"
-    | "model"
-    | "base_url"
-    | "api_key"
-    | "api_key_env"
-    | "default_temperature"
-    | "default_max_tokens"
-    | "max_retries"
-  >
->;
+const WORKFLOW_NODES = [
+  {
+    name: "数据接入",
+    tag: "HTTP / CSV / Excel",
+    desc: "接收政府监管平台推送的企业动态数据，并读取 Harness 挂载的 Markdown 静态知识库。",
+  },
+  {
+    name: "风险评估",
+    tag: "Stacking + SHAP",
+    desc: "加载序列化预警模型，输出红橙黄蓝四分类概率、置信度与 Top3 特征归因。",
+  },
+  {
+    name: "记忆召回",
+    tag: "AgentFS + RAG",
+    desc: "从 SQLite/Git 快照与长期知识库召回相似案例，经重排序后压缩为决策上下文。",
+  },
+  {
+    name: "决策生成",
+    tag: "LangGraph DAG",
+    desc: "按风险等级生成结构化处置建议，覆盖核心归因、政府协同干预与企业设施管控。",
+  },
+  {
+    name: "合规校验",
+    tag: "MARCH + Monte Carlo",
+    desc: "执行合规红线、工况逻辑、处置可行性三重审核，并用置信度采样拦截高风险输出。",
+  },
+  {
+    name: "结果推送",
+    tag: "Audit Trail",
+    desc: "将最终 Payload 写入审计链路；触发人工审核、驳回或准入等闭环状态。",
+  },
+];
 
-const EMPTY_LLM_FORM: LLMFormState = {
-  provider: "",
-  model: "",
-  base_url: "",
-  api_key: "",
-  api_key_env: "",
-  default_temperature: 0.3,
-  default_max_tokens: 8192,
-  max_retries: 3,
-};
+const CAPABILITY_ROWS = [
+  {
+    module: "多源数据治理",
+    basis: "方案一：特征工程预处理；方案二：多模态融合数据库",
+    detail: "二值、数值、枚举、文本和行业分类统一归一化；动态数据与法规、SOP、案例文本进入同一知识底座。",
+  },
+  {
+    module: "风险预测模型",
+    basis: "方案一：防泄露 Stacking 集成学习",
+    detail: "XGBoost、LightGBM、CatBoost、RF、LR、MLP、1D-CNN 作为基学习器，弹性网络逻辑回归融合输出。",
+  },
+  {
+    module: "长短期记忆",
+    basis: "方案二：AgentFS 与上下文召回机制",
+    detail: "P0-P3 记忆优先级、Token 阈值、RAG 检索、BGE-Reranker 重排与 Git 快照回滚支撑全过程溯源。",
+  },
+  {
+    module: "决策风控",
+    basis: "方案二：三重校验与高风险阻断",
+    detail: "MARCH 孤立验证拆解原子命题，蒙特卡洛采样要求置信度达标，低可信或不可逆动作转人工审核。",
+  },
+  {
+    module: "迭代管控",
+    basis: "方案一：动态迭代；方案二：PR/CI 联合终审",
+    detail: "新增样本或 F1 下降触发重训，候选模型需经过回归测试、灰度/金丝雀和政企两级终审。",
+  },
+];
+
+const KNOWLEDGE_FILES = [
+  "工矿风险预警智能体合规执行书.md",
+  "部门分级审核SOP.md",
+  "工业物理常识及传感器时间序列逻辑.md",
+  "企业已具备的执行条件.md",
+  "类似事故处理案例.md",
+  "预警历史经验与短期记忆摘要.md",
+];
 
 const API_TABLE = [
-  { path: "POST /api/v1/agent/decision", desc: "触发完整决策工作流" },
-  { path: "POST /api/v1/agent/decision/stream", desc: "SSE 流式节点状态" },
-  { path: "POST /api/v1/agent/scenario/{id}", desc: "切换场景配置" },
-  { path: "GET /api/v1/agent/llm", desc: "查询当前 LLM 模型配置" },
-  { path: "POST /api/v1/agent/llm/{provider}", desc: "切换已配置的 LLM provider" },
-  { path: "POST /api/v1/agent/llm", desc: "创建或更新自定义 OpenAI 兼容模型配置" },
-  { path: "POST /api/v1/data/upload", desc: "数据文件上传（CSV/Excel）" },
-  { path: "GET /api/v1/knowledge/list", desc: "知识库文件列表" },
-  { path: "GET /api/v1/knowledge/read/{filename}", desc: "知识库文件读取" },
-  { path: "GET /api/v1/iteration/status", desc: "迭代状态查询" },
-  { path: "POST /api/v1/iteration/trigger", desc: "触发迭代流水线" },
-  { path: "GET /api/v1/audit/query", desc: "审计日志查询" },
+  {
+    group: "健康与文档",
+    path: "GET /health",
+    desc: "后端连通性与版本检查",
+  },
+  {
+    group: "智能体决策",
+    path: "POST /api/v1/agent/decision",
+    desc: "触发完整 LangGraph 决策工作流",
+  },
+  {
+    group: "智能体决策",
+    path: "POST /api/v1/agent/decision/stream",
+    desc: "SSE 推送节点状态、最终决策与拦截结果",
+  },
+  {
+    group: "场景配置",
+    path: "POST /api/v1/agent/scenario/{id}",
+    desc: "切换危化品、冶金、粉尘涉爆场景阈值与知识库子集",
+  },
+  {
+    group: "风险预测",
+    path: "POST /api/v1/prediction/predict",
+    desc: "直接调用风险预测模型与校验器",
+  },
+  {
+    group: "数据管理",
+    path: "POST /api/v1/data/upload",
+    desc: "上传单个 CSV/Excel 企业数据文件",
+  },
+  {
+    group: "数据管理",
+    path: "POST /api/v1/data/upload/batch",
+    desc: "批量上传多份企业数据文件",
+  },
+  {
+    group: "知识库",
+    path: "GET /api/v1/knowledge/list",
+    desc: "查询长期知识库文件列表",
+  },
+  {
+    group: "知识库",
+    path: "GET /api/v1/knowledge/read/{filename}",
+    desc: "读取指定 Markdown 知识文件",
+  },
+  {
+    group: "知识库",
+    path: "POST /api/v1/knowledge/snapshot",
+    desc: "生成 AgentFS 状态快照与 Commit ID",
+  },
+  {
+    group: "迭代管控",
+    path: "GET /api/v1/iteration/status",
+    desc: "查询当前模型迭代与待审批状态",
+  },
+  {
+    group: "迭代管控",
+    path: "POST /api/v1/iteration/trigger",
+    desc: "触发新数据训练、回归测试与候选版本生成",
+  },
+  {
+    group: "迭代管控",
+    path: "POST /api/v1/iteration/approve",
+    desc: "提交模型候选版本审批结论",
+  },
+  {
+    group: "迭代管控",
+    path: "POST /api/v1/iteration/canary",
+    desc: "执行候选模型金丝雀发布检查",
+  },
+  {
+    group: "审计日志",
+    path: "GET /api/v1/audit/query",
+    desc: "按事件类型、企业、风险等级查询运行日志",
+  },
 ];
 
 export default function SystemConfigPage({ scenario, health }: Props) {
   const [latestHealth, setLatestHealth] = useState<HealthResponse | null>(health);
-  const [llmConfig, setLlmConfig] = useState<LLMConfigResponse | null>(null);
-  const [switchingProvider, setSwitchingProvider] = useState(false);
-  const [llmMessage, setLlmMessage] = useState<string>("");
-  const [llmForm, setLlmForm] = useState<LLMFormState>(EMPTY_LLM_FORM);
 
   useEffect(() => {
     fetchHealth().then(setLatestHealth);
-    fetchLLMConfig().then(setLlmConfig);
   }, []);
-
-  useEffect(() => {
-    if (!llmConfig) return;
-    setLlmForm((prev) => ({
-      ...prev,
-      provider: llmConfig.provider,
-      model: llmConfig.model,
-      base_url: llmConfig.base_url,
-      default_temperature: llmConfig.default_temperature,
-      default_max_tokens: llmConfig.default_max_tokens,
-      max_retries: llmConfig.max_retries,
-    }));
-  }, [llmConfig]);
 
   const cfg = SCENARIO_CONFIG[scenario];
   const online = latestHealth?.status === "healthy";
-  const activeProvider = llmConfig?.provider ?? "";
-  const availableProviders = llmConfig?.available_providers ?? [];
-
-  async function changeLLMProvider(provider: LLMProvider) {
-    setSwitchingProvider(true);
-    setLlmMessage("");
-    const next = await switchLLMProvider(provider);
-    if (next) {
-      setLlmConfig(next);
-      setLlmMessage(next.message || `LLM 已切换为 ${provider}`);
-    } else {
-      setLlmMessage("LLM 切换失败：请确认后端已启动，且 provider 配置有效。");
-    }
-    setSwitchingProvider(false);
-  }
-
-  async function saveLLMConfig() {
-    if (!llmForm.provider.trim()) {
-      setLlmMessage("LLM 配置保存失败：provider 不能为空。");
-      return;
-    }
-
-    setSwitchingProvider(true);
-    setLlmMessage("");
-    const payload: LLMUpdateRequest = {
-      provider: llmForm.provider.trim(),
-      model: llmForm.model.trim() || undefined,
-      base_url: llmForm.base_url.trim() || undefined,
-      api_key: llmForm.api_key.trim() || undefined,
-      api_key_env: llmForm.api_key_env.trim() || undefined,
-      default_temperature: Number(llmForm.default_temperature),
-      default_max_tokens: Number(llmForm.default_max_tokens),
-      max_retries: Number(llmForm.max_retries),
-    };
-    const next = await updateLLMConfig(payload);
-    if (next) {
-      setLlmConfig(next);
-      setLlmMessage(next.message || `LLM 配置已更新为 ${next.provider}`);
-      setLlmForm((prev) => ({ ...prev, api_key: "" }));
-    } else {
-      setLlmMessage("LLM 配置保存失败：请确认后端已启动，且参数格式有效。");
-    }
-    setSwitchingProvider(false);
-  }
+  const scenarioName = SCENARIO_NAMES[scenario];
+  const contractSample = useMemo(
+    () => ({
+      request: {
+        enterprise_id: "CHEM-2024-001",
+        scenario_id: scenario,
+        data: {
+          企业名称: "示例工矿企业",
+          行业监管大类: scenarioName,
+          具体风险描述: "传感器异常、巡检记录与执法记录等原始字段",
+        },
+      },
+      response: {
+        enterprise_id: "CHEM-2024-001",
+        predicted_level: "红 | 橙 | 黄 | 蓝",
+        probability_distribution: {
+          红: 0.82,
+          橙: 0.13,
+          黄: 0.03,
+          蓝: 0.02,
+        },
+        shap_contributions: [
+          { feature: "重大风险数量", contribution: 0.32 },
+          { feature: "文本高危词命中", contribution: 0.21 },
+          { feature: "消防设施完好率", contribution: -0.12 },
+        ],
+        decision_payload: [
+          "风险等级与核心归因",
+          "政府跨部门协同干预建议",
+          "企业设施管控建议",
+        ],
+        guardrails: {
+          march: "合规红线 / 工况逻辑 / 处置可行性",
+          monte_carlo_confidence_threshold: cfg["置信度阈值"],
+          audit: "全流程日志与 AgentFS 快照",
+        },
+      },
+    }),
+    [cfg, scenario, scenarioName],
+  );
 
   return (
     <div>
-      <div className="section-title">⚙️ 系统配置与 API 文档</div>
+      <div className="section-title">系统配置与 API 文档</div>
 
-      <div className="subtitle">🤖 后端连通状态</div>
       <div className={`alert ${online ? "success" : "error"}`}>
         {online
-          ? `✅ FastAPI 后端已连通  (version=${latestHealth?.version ?? "—"})`
-          : "❌ 后端未连通（前端将以本地 Mock 数据进行演示）"}
+          ? `FastAPI 后端已连通，当前版本 ${latestHealth?.version ?? "-"}；模型与大模型调用由后端统一调度。`
+          : "后端未连通，前端将以本地 Mock 数据演示；请先启动 FastAPI 服务。"}
       </div>
 
-      <div className="subtitle">🧠 大模型切换</div>
-      <div className="scada-card" style={{ marginBottom: 16 }}>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "minmax(180px, 260px) 1fr",
-            gap: 16,
-          }}
-        >
-          <div>
-            <label className="scada-label" htmlFor="llm-provider">
-              当前 LLM Provider
-            </label>
-            <select
-              id="llm-provider"
-              className="scada-select"
-              value={activeProvider}
-              disabled={!online || switchingProvider}
-              onChange={(e) => changeLLMProvider(e.target.value as LLMProvider)}
-            >
-              {availableProviders.length === 0 && (
-                <option value="">暂无已配置 provider</option>
-              )}
-              {availableProviders.map((provider) => (
-                <option key={provider} value={provider}>
-                  {provider}
-                </option>
-              ))}
-            </select>
-            <div className="scada-card-sub">
-              {!online
-                ? "后端未连通，暂不可切换"
-                : "选项来自后端 llm.providers 配置"}
+      <div className="row cols-4 system-kpi-grid">
+        <div className="scada-card">
+          <div className="scada-card-title">API BASE</div>
+          <div className="system-kpi-value font-mono">{apiBase}</div>
+          <div className="scada-card-sub">同源代理或 VITE_API_BASE</div>
+        </div>
+        <div className="scada-card">
+          <div className="scada-card-title">当前场景</div>
+          <div className="system-kpi-value">{scenarioName}</div>
+          <div className="scada-card-sub">阈值与知识库子集随场景切换</div>
+        </div>
+        <div className="scada-card">
+          <div className="scada-card-title">决策链路</div>
+          <div className="system-kpi-value">6 节点</div>
+          <div className="scada-card-sub">接入、评估、召回、生成、校验、推送</div>
+        </div>
+        <div className="scada-card">
+          <div className="scada-card-title">治理阈值</div>
+          <div className="system-kpi-value font-mono">{String(cfg["置信度阈值"])}</div>
+          <div className="scada-card-sub">蒙特卡洛置信度下限</div>
+        </div>
+      </div>
+
+      <div className="subtitle">方案映射的系统能力</div>
+      <table className="scada-table">
+        <thead>
+          <tr>
+            <th>模块</th>
+            <th>方案依据</th>
+            <th>页面配置含义</th>
+          </tr>
+        </thead>
+        <tbody>
+          {CAPABILITY_ROWS.map((row) => (
+            <tr key={row.module}>
+              <td>{row.module}</td>
+              <td>{row.basis}</td>
+              <td>{row.detail}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      <div className="subtitle">智能体后端工作流</div>
+      <div className="workflow-strip">
+        {WORKFLOW_NODES.map((node, index) => (
+          <div className="workflow-node-card" key={node.name}>
+            <div className="workflow-node-index font-mono">{index + 1}</div>
+            <div>
+              <div className="workflow-node-title">{node.name}</div>
+              <div className="workflow-node-tag">{node.tag}</div>
+              <div className="workflow-node-desc">{node.desc}</div>
             </div>
           </div>
-          <div>
-            <JsonView
-              data={{
-                provider: llmConfig?.provider ?? "unknown",
-                model: llmConfig?.model ?? "unknown",
-                base_url: llmConfig?.base_url ?? "unknown",
-                api_key: llmConfig?.has_api_key ? "已配置" : "未配置",
-                temperature: llmConfig?.default_temperature ?? "unknown",
-                max_tokens: llmConfig?.default_max_tokens ?? "unknown",
-                max_retries: llmConfig?.max_retries ?? "unknown",
-              }}
-              maxHeight={180}
-            />
-          </div>
-        </div>
-        {llmMessage && (
-          <div
-            className={`alert ${llmMessage.includes("失败") ? "error" : "success"}`}
-            style={{ marginTop: 12 }}
-          >
-            {llmMessage}
-          </div>
-        )}
-        {llmConfig && !llmConfig.has_api_key && (
-          <div className="alert warning" style={{ marginTop: 12 }}>
-            当前 provider 未检测到 API Key，实际决策可能进入 Mock 降级。请在后端环境变量中配置对应 Key。
-          </div>
-        )}
-
-        <div className="divider" />
-        <div className="subtitle">自定义 OpenAI 兼容模型</div>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-            gap: 12,
-          }}
-        >
-          <div>
-            <label className="scada-label" htmlFor="llm-custom-provider">
-              Provider 名称
-            </label>
-            <input
-              id="llm-custom-provider"
-              className="scada-input"
-              value={llmForm.provider}
-              placeholder="例如：qwen、siliconflow、local-openai"
-              onChange={(e) => setLlmForm({ ...llmForm, provider: e.target.value })}
-            />
-          </div>
-          <div>
-            <label className="scada-label" htmlFor="llm-custom-model">
-              模型名称
-            </label>
-            <input
-              id="llm-custom-model"
-              className="scada-input"
-              value={llmForm.model}
-              placeholder="例如：qwen-plus、gpt-4o-mini、本地模型名"
-              onChange={(e) => setLlmForm({ ...llmForm, model: e.target.value })}
-            />
-          </div>
-          <div>
-            <label className="scada-label" htmlFor="llm-custom-base-url">
-              Base URL
-            </label>
-            <input
-              id="llm-custom-base-url"
-              className="scada-input"
-              value={llmForm.base_url}
-              placeholder="https://.../v1"
-              onChange={(e) => setLlmForm({ ...llmForm, base_url: e.target.value })}
-            />
-          </div>
-          <div>
-            <label className="scada-label" htmlFor="llm-custom-key-env">
-              API Key 环境变量名
-            </label>
-            <input
-              id="llm-custom-key-env"
-              className="scada-input"
-              value={llmForm.api_key_env}
-              placeholder="例如：CUSTOM_LLM_API_KEY"
-              onChange={(e) => setLlmForm({ ...llmForm, api_key_env: e.target.value })}
-            />
-          </div>
-          <div>
-            <label className="scada-label" htmlFor="llm-custom-api-key">
-              API Key（可选，仅当前进程生效）
-            </label>
-            <input
-              id="llm-custom-api-key"
-              className="scada-input"
-              value={llmForm.api_key}
-              type="password"
-              placeholder="留空则使用环境变量"
-              onChange={(e) => setLlmForm({ ...llmForm, api_key: e.target.value })}
-            />
-          </div>
-          <div>
-            <label className="scada-label" htmlFor="llm-custom-temperature">
-              Temperature
-            </label>
-            <input
-              id="llm-custom-temperature"
-              className="scada-input"
-              value={llmForm.default_temperature}
-              type="number"
-              min={0}
-              max={2}
-              step={0.1}
-              onChange={(e) =>
-                setLlmForm({ ...llmForm, default_temperature: Number(e.target.value) })
-              }
-            />
-          </div>
-          <div>
-            <label className="scada-label" htmlFor="llm-custom-max-tokens">
-              Max Tokens
-            </label>
-            <input
-              id="llm-custom-max-tokens"
-              className="scada-input"
-              value={llmForm.default_max_tokens}
-              type="number"
-              min={1}
-              onChange={(e) =>
-                setLlmForm({ ...llmForm, default_max_tokens: Number(e.target.value) })
-              }
-            />
-          </div>
-          <div>
-            <label className="scada-label" htmlFor="llm-custom-retries">
-              Max Retries
-            </label>
-            <input
-              id="llm-custom-retries"
-              className="scada-input"
-              value={llmForm.max_retries}
-              type="number"
-              min={1}
-              onChange={(e) =>
-                setLlmForm({ ...llmForm, max_retries: Number(e.target.value) })
-              }
-            />
-          </div>
-        </div>
-        <button
-          className="scada-btn"
-          style={{ marginTop: 12 }}
-          disabled={!online || switchingProvider}
-          onClick={saveLLMConfig}
-        >
-          保存并切换到该模型
-        </button>
+        ))}
       </div>
 
-      <div className="subtitle">🎛️ 当前场景配置参数</div>
-      <JsonView data={cfg} maxHeight={220} />
+      <div className="row cols-2" style={{ marginTop: 12 }}>
+        <div>
+          <div className="subtitle">当前场景配置参数</div>
+          <JsonView data={cfg} maxHeight={220} />
+        </div>
+        <div>
+          <div className="subtitle">核心知识库矩阵</div>
+          <div className="knowledge-matrix">
+            {KNOWLEDGE_FILES.map((file) => (
+              <div className="knowledge-file" key={file}>
+                <span className="knowledge-file-dot" />
+                <span>{file}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
 
       <div className="divider" />
 
-      <div className="subtitle">📖 API 文档</div>
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          gap: 6,
-          fontSize: 13,
-          color: "#9ca3af",
-        }}
-      >
-        <div>
-          • <a href="/docs" target="_blank" rel="noreferrer">Swagger UI（同源代理）</a>
-        </div>
-        <div>
-          • <a href="/redoc" target="_blank" rel="noreferrer">Redoc（同源代理）</a>
-        </div>
-        <div>
-          • 健康检查:{" "}
-          <span className="font-mono" style={{ color: "#e5e7eb" }}>
-            GET /health
-          </span>
-        </div>
+      <div className="subtitle">API 文档入口</div>
+      <div className="doc-link-row">
+        <a className="doc-link" href="/docs" target="_blank" rel="noreferrer">
+          Swagger UI
+        </a>
+        <a className="doc-link" href="/redoc" target="_blank" rel="noreferrer">
+          Redoc
+        </a>
+        <span className="doc-link muted font-mono">GET /health</span>
       </div>
 
+      <div className="subtitle">接口输入输出契约</div>
+      <JsonView data={contractSample} maxHeight={360} />
+
       <div className="subtitle" style={{ marginTop: 16 }}>
-        🔌 核心接口速查
+        核心接口速查
       </div>
       <table className="scada-table">
         <thead>
           <tr>
+            <th>分组</th>
             <th>接口</th>
             <th>说明</th>
           </tr>
@@ -378,6 +322,7 @@ export default function SystemConfigPage({ scenario, health }: Props) {
         <tbody>
           {API_TABLE.map((r) => (
             <tr key={r.path}>
+              <td>{r.group}</td>
               <td className="font-mono">{r.path}</td>
               <td>{r.desc}</td>
             </tr>
@@ -386,14 +331,17 @@ export default function SystemConfigPage({ scenario, health }: Props) {
       </table>
 
       <div className="divider" />
-      <div className="subtitle">ℹ️ 系统信息</div>
+      <div className="subtitle">系统运行信息</div>
       <JsonView
         data={{
           backend_status: latestHealth?.status ?? "unknown",
           version: latestHealth?.version ?? "unknown",
           api_base: apiBase,
           frontend: "React + Vite + ECharts (SCADA Theme)",
-          recommended_resolution: "1920×1080",
+          backend: "Python + FastAPI + LangGraph",
+          model_layer: "防泄露 Stacking 风险预警模型",
+          memory_layer: "AgentFS + SQLite + Git + RAG",
+          guardrails: "MARCH 三重校验 + Monte Carlo 高风险阻断",
           theme: "Industrial Control Room Dark",
         }}
       />

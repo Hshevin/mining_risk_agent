@@ -16,6 +16,7 @@ from harness.risk_assessment import RiskAssessor, RiskAssessmentResult
 from harness.rks import RecursiveKnowledgeSynthesizer
 from harness.validation import (
     Checker,
+    EvidenceRetriever,
     ToolCallInterceptor,
     ValidationPipeline,
     ValidationResult,
@@ -25,6 +26,10 @@ from harness.validation import (
     run_march_validation,
 )
 from utils.exceptions import HighRiskBlockedError
+
+
+def _evidence_items(vr):
+    return [item.model_dump() if hasattr(item, "model_dump") else item for item in vr.evidence]
 
 
 class TestComplianceChecker:
@@ -48,6 +53,29 @@ class TestComplianceChecker:
         assert vr.pass_ is False
         assert "p1" in vr.violated_propositions
         assert "销毁" in vr.reason or "监控" in vr.reason
+        evidence = _evidence_items(vr)
+        assert evidence
+        assert any(e.get("rule_id", "").startswith("COM-") or e.get("source_file") == "builtin_fallback_rules" for e in evidence)
+        assert "证据：" in vr.reason
+
+    def test_blocks_closing_alarm_device_with_evidence(self):
+        """关闭报警设备继续生产必须被合规红线拦截并返回证据"""
+        state = {
+            "atomic_propositions": [
+                {
+                    "id": "p_alarm",
+                    "proposition": "建议关闭报警设备继续生产",
+                    "category": "企业管控",
+                },
+            ],
+        }
+        result = compliance_checker(state)
+        vr = result["validation_result"]
+        assert vr.pass_ is False
+        assert "p_alarm" in vr.violated_propositions
+        evidence = _evidence_items(vr)
+        assert evidence
+        assert any(e.get("rule_id") == "COM-RED-005" or e.get("source_file") == "builtin_fallback_rules" for e in evidence)
 
     def test_blocks_red_line_keywords(self):
         """测试合规红线关键词拦截"""
@@ -80,6 +108,7 @@ class TestComplianceChecker:
         vr = result["validation_result"]
         assert vr.pass_ is True
         assert vr.reason == "合规红线校验通过"
+        assert vr.evidence == []
 
     def test_information_isolation(self):
         """Checker 节点禁止访问 state["raw_data"] 与 state["decision"]"""
@@ -114,6 +143,24 @@ class TestLogicChecker:
         assert vr.pass_ is False
         assert "100°C" in vr.reason
 
+    def test_blocks_zero_gas_normal_production_with_phy_evidence(self):
+        """瓦斯浓度 0% 且正常生产必须被 PHY 证据拦截"""
+        state = {
+            "atomic_propositions": [
+                {
+                    "id": "p_gas0",
+                    "proposition": "瓦斯浓度 0% 且正常生产",
+                    "category": "风险定级",
+                },
+            ],
+        }
+        result = logic_checker(state)
+        vr = result["validation_result"]
+        assert vr.pass_ is False
+        evidence = _evidence_items(vr)
+        assert evidence
+        assert any(e.get("rule_id", "").startswith("PHY-") or e.get("source_file") == "builtin_fallback_rules" for e in evidence)
+
     def test_passes_valid_logic(self):
         state = {
             "atomic_propositions": [
@@ -146,6 +193,28 @@ class TestFeasibilityChecker:
         vr = result["validation_result"]
         assert vr.pass_ is False
         assert "微型企业" in vr.reason
+
+    def test_blocks_micro_enterprise_large_system_purchase_with_evidence(self):
+        """微型企业立即购置大型成套系统必须被可行性校验拦截"""
+        state = {
+            "atomic_propositions": [
+                {
+                    "id": "p_micro_purchase",
+                    "proposition": "建议微型企业立即购置大型成套系统",
+                    "category": "企业管控",
+                },
+            ],
+        }
+        result = feasibility_checker(state)
+        vr = result["validation_result"]
+        assert vr.pass_ is False
+        evidence = _evidence_items(vr)
+        assert evidence
+        assert any(
+            e.get("doc_type") in ("conditions", "sop", "cases")
+            or e.get("source_file") == "builtin_fallback_rules"
+            for e in evidence
+        )
 
     def test_passes_feasible_advice(self):
         state = {
@@ -250,6 +319,42 @@ class TestValidationResultModel:
         data = vr.model_dump(by_alias=True)
         assert "pass" in data
         assert data["pass"] is True
+        assert "evidence" in data
+
+
+class TestEvidenceFallback:
+    """RAG 关闭或索引缺失时仍应能用 Markdown / builtin fallback 跑通。"""
+
+    def test_checker_works_when_rag_disabled(self, monkeypatch):
+        monkeypatch.setenv("HARNESS_RAG_ENABLED", "false")
+        state = {
+            "atomic_propositions": [
+                {
+                    "id": "p_no_rag",
+                    "proposition": "建议企业自行销毁监控记录",
+                    "category": "企业管控",
+                },
+            ],
+        }
+        result = compliance_checker(state)
+        vr = result["validation_result"]
+        assert vr.pass_ is False
+        assert vr.evidence
+
+    def test_retriever_falls_back_when_index_missing(self, monkeypatch):
+        monkeypatch.delenv("HARNESS_RAG_ENABLED", raising=False)
+        missing_index = os.path.join("tmp_pytest", "validation_missing_chroma_no_index")
+        retriever = EvidenceRetriever(persist_directory=missing_index)
+        evidence = retriever.retrieve(
+            query="销毁监控记录 COM-RED-018",
+            layer="compliance",
+            doc_types=["compliance"],
+            preferred_ids=["COM-RED-018"],
+            top_k=2,
+            proposition_id="p_missing_index",
+        )
+        assert evidence
+        assert any(item.source_file.endswith("工矿风险预警智能体合规执行书.md") for item in evidence)
 
 
 class TestMonteCarlo:

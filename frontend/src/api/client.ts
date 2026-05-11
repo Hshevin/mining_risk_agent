@@ -8,13 +8,28 @@
 import type {
   AuditLogEntry,
   DataUploadResponse,
+  DatasetKind,
+  DemoResetResponse,
   DecisionResponse,
+  DemoBatch,
+  DemoIterationStepResponse,
+  DemoReplayLoadResponse,
   HealthResponse,
+  IterationAuditResponse,
+  IterationReportResponse,
+  IterationReportsResponse,
+  IterationRecord,
   IterationStatus,
+  IterationTimelineResponse,
   IterationTriggerResponse,
+  KnowledgeRagSearchResponse,
+  KnowledgeSystemOverview,
+  IterationUploadBatchResponse,
   LLMConfigResponse,
   LLMProvider,
   LLMUpdateRequest,
+  MemoryStatisticsParams,
+  MemoryStatisticsResponse,
   NodeStatus,
   ScenarioSwitchResponse,
 } from "./types";
@@ -41,6 +56,67 @@ async function jsonOrThrow<T>(resp: Response): Promise<T> {
     throw new Error(`HTTP ${resp.status} ${resp.statusText} ${text}`);
   }
   return (await resp.json()) as T;
+}
+
+async function responseError(resp: Response): Promise<string> {
+  const text = await resp.text().catch(() => "");
+  if (!text) return `HTTP ${resp.status} ${resp.statusText}`;
+  try {
+    const payload = JSON.parse(text) as { detail?: unknown; message?: unknown };
+    const detail = payload.detail ?? payload.message;
+    return `HTTP ${resp.status} ${resp.statusText}: ${
+      typeof detail === "string" ? detail : JSON.stringify(detail)
+    }`;
+  } catch {
+    return `HTTP ${resp.status} ${resp.statusText}: ${text}`;
+  }
+}
+
+function clearApiError(path: string, error: unknown): Error {
+  const message = error instanceof Error ? error.message : String(error);
+  if (/^HTTP \d+/.test(message)) {
+    return new Error(`后端返回错误 ${path}：${message}`);
+  }
+  return new Error(`无法连接后端 ${path}：${message}`);
+}
+
+function clearApiErrorCn(path: string, error: unknown): Error {
+  const message = error instanceof Error ? error.message : String(error);
+  if (/^HTTP \d+/.test(message)) {
+    return new Error(`后端返回错误 ${path}: ${message}`);
+  }
+  return new Error(`无法连接后端 ${path}: ${message}`);
+}
+
+async function fetchJsonStrict<T>(
+  path: string,
+  init?: RequestInit,
+): Promise<T> {
+  try {
+    const resp = await fetch(url(path), init);
+    if (!resp.ok) {
+      throw new Error(await responseError(resp));
+    }
+    return (await resp.json()) as T;
+  } catch (error) {
+    throw clearApiErrorCn(path, error);
+  }
+}
+
+async function fetchJsonNullable404<T>(
+  path: string,
+  init?: RequestInit,
+): Promise<T | null> {
+  try {
+    const resp = await fetch(url(path), init);
+    if (resp.status === 404) return null;
+    if (!resp.ok) {
+      throw new Error(await responseError(resp));
+    }
+    return (await resp.json()) as T;
+  } catch (error) {
+    throw clearApiErrorCn(path, error);
+  }
 }
 
 export async function fetchHealth(): Promise<HealthResponse> {
@@ -221,6 +297,78 @@ export async function readKnowledge(
   }
 }
 
+export async function fetchKnowledgeSystemOverview(): Promise<KnowledgeSystemOverview | null> {
+  try {
+    const resp = await fetch(url("/api/v1/knowledge/system/overview"));
+    if (!resp.ok) return null;
+    return (await resp.json()) as KnowledgeSystemOverview;
+  } catch {
+    return null;
+  }
+}
+
+export async function searchKnowledgeRag(
+  query: string,
+  topK = 6,
+): Promise<KnowledgeRagSearchResponse | null> {
+  try {
+    const usp = new URLSearchParams();
+    usp.set("q", query);
+    usp.set("top_k", String(topK));
+    const resp = await fetch(url(`/api/v1/knowledge/rag/search?${usp.toString()}`));
+    if (!resp.ok) return null;
+    return (await resp.json()) as KnowledgeRagSearchResponse;
+  } catch {
+    return null;
+  }
+}
+
+function appendParams(usp: URLSearchParams, params: Record<string, unknown>) {
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== "") {
+      usp.set(key, String(value));
+    }
+  });
+}
+
+export async function fetchMemoryStatistics(
+  params: MemoryStatisticsParams = {},
+): Promise<MemoryStatisticsResponse | null> {
+  try {
+    const usp = new URLSearchParams();
+    appendParams(usp, params as Record<string, unknown>);
+    const suffix = usp.toString();
+    const resp = await fetch(url(`/api/v1/memory/statistics${suffix ? `?${suffix}` : ""}`));
+    if (!resp.ok) return null;
+    return (await resp.json()) as MemoryStatisticsResponse;
+  } catch {
+    return null;
+  }
+}
+
+export async function downloadMemoryExport(
+  params: MemoryStatisticsParams = {},
+  format: "csv" | "xlsx" | "pdf" = "csv",
+): Promise<void> {
+  const usp = new URLSearchParams();
+  appendParams(usp, { ...params, format });
+  const resp = await fetch(url(`/api/v1/memory/export?${usp.toString()}`));
+  if (!resp.ok) {
+    throw new Error(await responseError(resp));
+  }
+  const blob = await resp.blob();
+  const objectUrl = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  const disposition = resp.headers.get("Content-Disposition") || "";
+  const encoded = disposition.match(/filename\*=UTF-8''([^;]+)/)?.[1];
+  anchor.href = objectUrl;
+  anchor.download = encoded ? decodeURIComponent(encoded) : `memory_${params.module || "all"}.${format}`;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(objectUrl);
+}
+
 export async function fetchIterationStatus(): Promise<IterationStatus | null> {
   try {
     const resp = await fetch(url("/api/v1/iteration/status"));
@@ -229,6 +377,152 @@ export async function fetchIterationStatus(): Promise<IterationStatus | null> {
   } catch {
     return null;
   }
+}
+
+export async function fetchDemoBatches(): Promise<DemoBatch[]> {
+  return fetchJsonStrict<DemoBatch[]>("/api/v1/iteration/demo-batches");
+}
+
+export async function loadDemoBatch(
+  batchId: string,
+): Promise<DemoReplayLoadResponse | null> {
+  return fetchJsonStrict<DemoReplayLoadResponse>(
+    `/api/v1/iteration/demo-batches/${encodeURIComponent(batchId)}/load`,
+    { method: "POST" },
+  );
+}
+
+export async function fetchLatestIteration(): Promise<IterationRecord | null> {
+  return fetchJsonNullable404<IterationRecord>("/api/v1/iteration/latest");
+}
+
+export async function fetchIterationRecord(
+  iterationId: string,
+): Promise<IterationRecord | null> {
+  return fetchJsonNullable404<IterationRecord>(
+    `/api/v1/iteration/${encodeURIComponent(iterationId)}`,
+  );
+}
+
+export async function fetchIterationTimeline(
+  iterationId: string,
+): Promise<IterationTimelineResponse | null> {
+  return fetchJsonNullable404<IterationTimelineResponse>(
+    `/api/v1/iteration/${encodeURIComponent(iterationId)}/timeline`,
+  );
+}
+
+export async function fetchBatchLatestIteration(
+  batchId: string,
+): Promise<IterationRecord | null> {
+  return fetchJsonNullable404<IterationRecord>(
+    `/api/v1/iteration/batches/${encodeURIComponent(batchId)}/latest-run`,
+  );
+}
+
+export async function uploadIterationBatch(
+  file: File,
+  datasetKind: DatasetKind = "auto",
+  recentF1Override?: string,
+): Promise<IterationUploadBatchResponse> {
+  const form = new FormData();
+  form.append("file", file);
+  form.append("dataset_kind", datasetKind);
+  if (recentF1Override?.trim()) {
+    form.append("recent_f1_override", recentF1Override.trim());
+  }
+  return fetchJsonStrict<IterationUploadBatchResponse>(
+    "/api/v1/iteration/upload-batch",
+    {
+      method: "POST",
+      body: form,
+    },
+  );
+}
+
+export async function resetIterationDemoState(): Promise<DemoResetResponse> {
+  return fetchJsonStrict<DemoResetResponse>("/api/v1/iteration/demo/reset", {
+    method: "POST",
+  });
+}
+
+export type DemoIterationAction =
+  | "train"
+  | "regression-test"
+  | "drift-analysis"
+  | "pr/create"
+  | "ci/run"
+  | "approve/safety"
+  | "approve/tech"
+  | "staging/start"
+  | "staging/complete-demo"
+  | "canary/advance"
+  | "demo/run-next-step"
+  | "demo/run-to-end";
+
+export async function runDemoIterationAction(
+  iterationId: string,
+  action: DemoIterationAction,
+  body?: Record<string, unknown>,
+): Promise<DemoIterationStepResponse> {
+  return fetchJsonStrict<DemoIterationStepResponse>(
+    `/api/v1/iteration/${encodeURIComponent(iterationId)}/${action}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: body ? JSON.stringify(body) : undefined,
+    },
+  );
+}
+
+export async function fetchIterationAudit(
+  iterationId: string,
+): Promise<IterationAuditResponse | null> {
+  return fetchJsonNullable404<IterationAuditResponse>(
+    `/api/v1/iteration/${encodeURIComponent(iterationId)}/audit`,
+  );
+}
+
+export async function fetchIterationReports(
+  iterationId: string,
+): Promise<IterationReportsResponse | null> {
+  return fetchJsonNullable404<IterationReportsResponse>(
+    `/api/v1/iteration/${encodeURIComponent(iterationId)}/reports`,
+  );
+}
+
+export async function fetchIterationReport(
+  iterationId: string,
+  reportType: string,
+): Promise<IterationReportResponse | null> {
+  return fetchJsonNullable404<IterationReportResponse>(
+    `/api/v1/iteration/${encodeURIComponent(iterationId)}/reports/${encodeURIComponent(reportType)}`,
+  );
+}
+
+export async function downloadIterationReport(
+  iterationId: string,
+  reportType: string,
+): Promise<void> {
+  const resp = await fetch(
+    url(
+      `/api/v1/iteration/${encodeURIComponent(iterationId)}/reports/${encodeURIComponent(
+        reportType,
+      )}/download`,
+    ),
+  );
+  if (!resp.ok) {
+    throw new Error(await responseError(resp));
+  }
+  const blob = await resp.blob();
+  const objectUrl = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = objectUrl;
+  anchor.download = `${iterationId}_${reportType}.json`;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(objectUrl);
 }
 
 export async function triggerIteration(): Promise<IterationTriggerResponse | null> {

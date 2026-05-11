@@ -11,6 +11,15 @@ from iteration.drift_analysis import DriftAnalyzer
 from iteration.approval_fsm import ApprovalFSM, ApprovalStatus
 from iteration.staging_monitor import StagingMonitor
 from iteration.canary import CanaryDeployment
+from iteration.data_source import (
+    BatchMetadata,
+    DemoReplayDataSource,
+    EnterpriseDataBatch,
+    EnterpriseDataSource,
+)
+from iteration.demo_replay import DemoReplayService
+from iteration.demo_runner import DemoIterationError, DemoIterationRunner
+from iteration.state import IterationRecord, IterationState, TimelineEvent
 
 __all__ = [
     "ModelMonitor",
@@ -22,4 +31,14 @@ __all__ = [
     "ApprovalStatus",
     "StagingMonitor",
     "CanaryDeployment",
+    "BatchMetadata",
+    "EnterpriseDataBatch",
+    "EnterpriseDataSource",
+    "DemoReplayDataSource",
+    "DemoReplayService",
+    "DemoIterationRunner",
+    "DemoIterationError",
+    "IterationRecord",
+    "IterationState",
+    "TimelineEvent",
 ]

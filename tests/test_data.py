@@ -5,19 +5,44 @@
 
 import os
 import tempfile
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
 import pytest
+from fastapi.testclient import TestClient
 
+from api.main import create_app
+from api.routers import data as data_router
 from data.loader import DataLoader, DataUploadRequest
 from data.preprocessor import (BinaryEncoder, EnumRiskMapper, FeatureEngineeringPipeline,
                                                    IndustryRiskCoefficient, MissingValueHandler, NumericTransformer,
                                                    TextRiskExtractor)
+from utils.config import get_config, resolve_project_path
+from utils.exceptions import DataLoadingError
 
 
 class TestDataLoader:
     """测试数据加载器"""
+
+    def test_upload_api_persists_file_and_records(self, monkeypatch, tmp_path):
+        monkeypatch.setattr(data_router, "UPLOAD_DIR", tmp_path)
+        client = TestClient(create_app())
+
+        response = client.post(
+            "/api/v1/data/upload",
+            files={"file": ("sample.csv", b"col1,col2\n1,2\n3,4\n", "text/csv")},
+            data={"enterprise_id": "ENT001"},
+        )
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["persisted"] is True
+        assert body["rows"] == 2
+        assert body["record_count"] == 2
+        assert body["checksum"]
+        assert Path(body["saved_path"]).exists()
+        assert Path(body["record_path"]).exists()
 
     def test_load_csv(self):
         with tempfile.NamedTemporaryFile(suffix=".csv", delete=False, mode="w", encoding="utf-8-sig") as f:
@@ -50,6 +75,75 @@ class TestDataLoader:
         loader = DataLoader()
         df = loader.load_from_api(request)
         assert len(df) == 1
+
+    def test_configured_public_data_paths_exist(self):
+        config = get_config()
+        paths = [
+            config.data.public_data_root,
+            config.data.raw_data_path,
+            config.data.reference_data_path,
+            config.data.merged_data_path,
+        ]
+
+        for configured_path in paths:
+            assert configured_path is not None
+            assert resolve_project_path(configured_path).exists()
+
+        assert resolve_project_path(config.data.merged_data_path).suffix == ".xlsx"
+
+    def test_configured_raw_reference_and_merged_data_load(self):
+        loader = DataLoader()
+
+        raw_tables = loader.load_directory(loader.raw_data_path, nrows=2)
+        reference_tables = loader.load_directory(loader.reference_data_path, nrows=2)
+        merged = loader.load_merged_dataset(nrows=2)
+
+        assert len(raw_tables) >= 19
+        assert len(reference_tables) >= 20
+        assert merged.shape[0] == 2
+        assert "enterprise_id" in merged.columns
+        assert "new_level" in merged.columns
+
+    def test_public_data_scan_reads_majority_and_skips_bad_xlsx(self, caplog):
+        loader = DataLoader()
+        caplog.set_level("WARNING")
+
+        tables = loader.load_public_data(nrows=1)
+
+        assert len(tables) >= 60
+        assert "new_已清洗" in tables
+        assert "数据补充/enterprise_routine_check_log" not in tables
+        assert any(
+            "enterprise_routine_check_log.xlsx" in record.message
+            and "跳过无法读取的数据文件" in record.message
+            for record in caplog.records
+        )
+
+    def test_duplicate_field_csv_deduplicates_columns(self, caplog):
+        loader = DataLoader()
+        duplicate_csv = resolve_project_path(
+            "../公开数据/公开数据/新数据/ds_aczf_accessory_3_202603181744.csv"
+        )
+        caplog.set_level("WARNING")
+
+        df = loader.load_file(duplicate_csv, nrows=5)
+
+        assert "地区编码" in df.columns
+        assert "地区编码__dup2" in df.columns
+        assert any("重复字段已追加 __dupN 后缀" in record.message for record in caplog.records)
+
+    def test_bad_xlsx_can_be_strict_or_skipped(self, caplog):
+        loader = DataLoader()
+        bad_xlsx = resolve_project_path("../公开数据/公开数据/数据补充/enterprise_routine_check_log.xlsx")
+        caplog.set_level("WARNING")
+
+        with pytest.raises(DataLoadingError):
+            loader.load_file(bad_xlsx)
+
+        tables = loader.load_directory(Path(loader.raw_data_path), nrows=1)
+
+        assert "enterprise_routine_check_log" not in tables
+        assert any("enterprise_routine_check_log.xlsx" in record.message for record in caplog.records)
 
 
 class TestBinaryEncoder:

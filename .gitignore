@@ -5,6 +5,9 @@ __pycache__/
 .coverage
 htmlcov/
 .mypy_cache/
+tmp_pytest/
+.python*_nuget/
+*.nupkg
 
 # Local environment and secrets
 .env
@@ -12,9 +15,30 @@ htmlcov/
 !.env.example
 
 # Runtime data
+*.log
 logs/*.log
 data/*.db
 data/chroma_db/
+data/snapshots/
+data/uploads/
+audit/iterations/
+models/candidates/
+models/production/demo_current_pointer.json
+reports/approval/
+reports/canary/
+reports/ci/
+reports/demo_replay/
+reports/drift/
+reports/pr/
+reports/regression/
+reports/staging/
+reports/uploads/
+reports/*_run.json
+reports/*_inventory.json
+reports/*_inventory_report.md
+reports/*_field_mapping.csv
+reports/*_report.md
+reports/KNOWLEDGE_SYSTEM_FINAL_AUDIT.md
 
 # Training intermediates
 catboost_info/

@@ -73,6 +73,52 @@ def base_state(mock_raw_data, mock_prediction):
 
 
 # =============================================================================
+# 测试：memory_recall RAG 开关
+# =============================================================================
+
+@pytest.mark.asyncio
+class TestMemoryRecallNode:
+    """测试 memory_recall 对长期记忆 RAG 开关的处理。"""
+
+    @patch("agent.workflow._get_memory")
+    async def test_memory_recall_enabled_calls_rag(self, mock_get_memory, base_state):
+        mock_memory = MagicMock()
+        mock_memory.is_long_term_rag_enabled.return_value = True
+        mock_memory.recall_long_term = AsyncMock(return_value=[
+            {"text": "粉尘涉爆除尘系统异常处置证据", "metadata": {"source_file": "knowledge_base/test.md"}}
+        ])
+        mock_get_memory.return_value = mock_memory
+
+        state = base_state.copy()
+        state["node_status"] = []
+        result = await node_memory_recall(state)
+
+        assert result["memory_results"]
+        mock_memory.recall_long_term.assert_awaited_once()
+        status = result["node_status"][-1]
+        assert status["node"] == "memory_recall"
+        assert status["status"] == "completed"
+        assert "召回 1 条记忆" in status["detail"]
+
+    @patch("agent.workflow._get_memory")
+    async def test_memory_recall_disabled_skips_safely(self, mock_get_memory, base_state):
+        mock_memory = MagicMock()
+        mock_memory.is_long_term_rag_enabled.return_value = False
+        mock_memory.recall_long_term = AsyncMock(return_value=[])
+        mock_get_memory.return_value = mock_memory
+
+        state = base_state.copy()
+        state["node_status"] = []
+        result = await node_memory_recall(state)
+
+        assert result["memory_results"] == []
+        mock_memory.recall_long_term.assert_not_called()
+        status = result["node_status"][-1]
+        assert status["node"] == "memory_recall"
+        assert status["status"] == "skipped"
+
+
+# =============================================================================
 # 测试：正常通过流
 # =============================================================================
 
