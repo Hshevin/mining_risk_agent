@@ -239,6 +239,8 @@ class StackingRiskModel:
         self._build_base_learners()
         self._build_meta_learner()
         self.shap_explainer: Optional[Any] = None
+        self.n_features_in_: Optional[int] = None
+        self.feature_names_in_: Optional[List[str]] = None
 
     def _build_base_learners(self) -> None:
         """构建第一层基学习器"""
@@ -294,6 +296,8 @@ class StackingRiskModel:
         try:
             X_arr = _to_numpy(X)
             y_arr = np.asarray(y, dtype=int)
+            self.n_features_in_ = int(X_arr.shape[1])
+            self.feature_names_in_ = list(X.columns) if isinstance(X, pd.DataFrame) else None
 
             n_samples = X_arr.shape[0]
             n_base = len(self.base_learners)
@@ -380,6 +384,20 @@ class StackingRiskModel:
         meta_features = np.nan_to_num(meta_features, nan=0.0)
         return meta_features
 
+    def _expected_input_dim(self) -> Optional[int]:
+        """Return the feature dimension learned by this artifact, if available."""
+        if self.n_features_in_ is not None:
+            return int(self.n_features_in_)
+
+        for model in self.base_learners.values():
+            dim = getattr(model, "n_features_in_", None)
+            if dim is not None:
+                return int(dim)
+            dim = getattr(model, "_input_dim", None)
+            if dim is not None:
+                return int(dim)
+        return None
+
     def predict(self, X: Union[pd.DataFrame, np.ndarray]) -> Union[Dict[str, Any], List[Dict[str, Any]]]:
         """
         预测风险等级
@@ -392,6 +410,14 @@ class StackingRiskModel:
         """
         try:
             X_arr = _to_numpy(X)
+            expected_dim = self._expected_input_dim()
+            actual_dim = int(X_arr.shape[1])
+            if expected_dim is not None and actual_dim != expected_dim:
+                raise ValueError(
+                    "input feature dimension mismatch: "
+                    f"got {actual_dim}, expected {expected_dim}. "
+                    "Check that model_path and pipeline_path come from the same training run."
+                )
             n_samples = X_arr.shape[0]
 
             meta_features = self._generate_meta_features(X)
@@ -477,6 +503,8 @@ class StackingRiskModel:
             "meta_learner": self.meta_learner,
             "config": self.config,
             "risk_levels": self.risk_levels,
+            "n_features_in": self.n_features_in_,
+            "feature_names_in": self.feature_names_in_,
         }, path)
         logger.info(f"模型已保存至 {path}")
 
@@ -487,4 +515,6 @@ class StackingRiskModel:
         self.meta_learner = data["meta_learner"]
         self.config = data["config"]
         self.risk_levels = data["risk_levels"]
+        self.n_features_in_ = data.get("n_features_in")
+        self.feature_names_in_ = data.get("feature_names_in")
         logger.info(f"模型已从 {path} 加载")

@@ -13,9 +13,12 @@
     )
 """
 
+import hashlib
+import math
 import os
+import re
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Iterable, List, Optional
 
 try:
     import chromadb
@@ -33,10 +36,76 @@ except Exception as e:
     SentenceTransformer = None
     _SENTENCE_TRANSFORMERS_IMPORT_ERROR = e
 
-from utils.config import get_config
+from utils.config import get_config, resolve_project_path
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
+
+
+DEFAULT_FALLBACK_EMBEDDING_DIMENSIONS = 384
+
+
+def _env_bool(names: Iterable[str], default: bool) -> bool:
+    for name in names:
+        value = os.getenv(name)
+        if value is None:
+            continue
+        return value.strip().lower() in {"1", "true", "yes", "on", "y"}
+    return default
+
+
+def _stable_hash(value: str) -> int:
+    digest = hashlib.blake2b(value.encode("utf-8"), digest_size=8).digest()
+    return int.from_bytes(digest, byteorder="big", signed=False)
+
+
+def _fallback_features(text: str) -> Iterable[tuple[str, float]]:
+    normalized = re.sub(r"\s+", "", text.lower())
+    if not normalized:
+        return
+
+    domain_phrases = [
+        "粉尘涉爆", "粉尘爆炸", "除尘", "除尘系统", "积尘", "动火",
+        "危化品", "危险化学品", "泄漏", "储罐", "可燃气体", "有毒气体",
+        "冶金", "煤气", "煤气报警", "co报警", "熔融金属", "高炉", "转炉",
+        "有限空间", "受限空间", "中毒窒息", "中毒和窒息", "缺氧", "通风", "检测",
+        "重大隐患", "红级", "橙级", "报警", "联锁", "传感器", "风险", "处置",
+    ]
+    for phrase in domain_phrases:
+        if phrase in normalized:
+            yield f"phrase:{phrase}", 3.0
+
+    words = re.findall(r"[a-z0-9_]+", normalized)
+    for word in words:
+        yield f"word:{word}", 1.4
+
+    # Chinese safety texts are short and terminology-heavy. Character n-grams
+    # give deterministic lexical recall without external model files.
+    for n, weight in ((1, 0.25), (2, 0.9), (3, 1.2), (4, 1.0)):
+        if len(normalized) < n:
+            continue
+        for i in range(len(normalized) - n + 1):
+            gram = normalized[i:i + n]
+            if re.search(r"[\u4e00-\u9fffA-Za-z0-9]", gram):
+                yield f"ngram{n}:{gram}", weight
+
+
+def deterministic_embedding(
+    texts: List[str],
+    dimensions: int = DEFAULT_FALLBACK_EMBEDDING_DIMENSIONS,
+) -> List[List[float]]:
+    """Return deterministic, normalized embeddings for offline indexing/tests."""
+    embeddings: List[List[float]] = []
+    for text in texts:
+        vec = [0.0] * dimensions
+        for feature, weight in _fallback_features(text):
+            idx = _stable_hash(feature) % dimensions
+            vec[idx] += weight
+        norm = math.sqrt(sum(value * value for value in vec))
+        if norm > 0:
+            vec = [value / norm for value in vec]
+        embeddings.append(vec)
+    return embeddings
 
 
 def split_by_headers(text: str, max_chunk_size: int = 300, overlap: int = 50) -> List[Dict]:
@@ -191,22 +260,38 @@ class VectorStore:
 
     def __init__(
         self,
-        collection_name: str = "knowledge_base",
+        collection_name: Optional[str] = None,
         embedding_model: Optional[str] = None,
         persist_directory: Optional[str] = None,
         embedding_fn: Optional[callable] = None,
+        embedding_backend: Optional[str] = None,
     ):
         config = get_config()
-        self.embedding_model_name = embedding_model or config.harness.memory.long_term.rag.get(
+        rag_config = config.harness.memory.long_term.rag
+        self.collection_name = collection_name or rag_config.get("collection_name", "knowledge_base")
+        self.embedding_model_name = embedding_model or rag_config.get(
             "embedding_model", "BAAI/bge-large-zh-v1.5"
         )
-        self.chunk_size = config.harness.memory.long_term.rag.get("chunk_size", 300)
-        self.chunk_overlap = config.harness.memory.long_term.rag.get("chunk_overlap", 50)
+        self.chunk_size = rag_config.get("chunk_size", 300)
+        self.chunk_overlap = rag_config.get("chunk_overlap", 50)
         self._embedding_fn = embedding_fn
+        self.embedding_backend = (
+            embedding_backend
+            or os.getenv("RAG_EMBEDDING_BACKEND")
+            or os.getenv("MINING_RAG_EMBEDDING_BACKEND")
+            or rag_config.get("embedding_backend", "auto")
+        ).strip().lower()
+        self.allow_fallback_embedding = _env_bool(
+            ("RAG_ALLOW_FALLBACK_EMBEDDING", "MINING_RAG_ALLOW_FALLBACK_EMBEDDING"),
+            bool(rag_config.get("allow_fallback_embedding", True)),
+        )
+        self._fallback_warned = False
         
         # ChromaDB 客户端
         if persist_directory is None:
-            persist_directory = "data/chroma_db"
+            persist_directory = rag_config.get("persist_directory", "data/chroma_db")
+        if not os.path.isabs(str(persist_directory)):
+            persist_directory = str(resolve_project_path(str(persist_directory)))
         self.persist_directory = persist_directory
         os.makedirs(persist_directory, exist_ok=True)
 
@@ -218,11 +303,31 @@ class VectorStore:
                 f"{detail}"
             )
         
-        self.client = chromadb.PersistentClient(
-            path=persist_directory,
-            settings=Settings(anonymized_telemetry=False),
+        client_settings = Settings(anonymized_telemetry=False)
+        try:
+            self.client = chromadb.PersistentClient(
+                path=persist_directory,
+                settings=client_settings,
+            )
+        except Exception as e:
+            # Some tests and legacy callers stop Chroma's shared system directly.
+            # In Chroma 1.5 that can leave a stale RustBindingsAPI in the process
+            # cache; clearing the cache and retrying recreates the local client.
+            try:
+                from chromadb.api.client import SharedSystemClient
+
+                SharedSystemClient.clear_system_cache()
+                self.client = chromadb.PersistentClient(
+                    path=persist_directory,
+                    settings=client_settings,
+                )
+                logger.warning(f"Chroma shared system cache was stale; recreated client for {persist_directory}: {e}")
+            except Exception:
+                raise
+        self.collection = self.client.get_or_create_collection(
+            name=self.collection_name,
+            metadata={"hnsw:space": "cosine"},
         )
-        self.collection = self.client.get_or_create_collection(name=collection_name)
         
         # 嵌入模型（延迟加载）
         self._embedding_model: Optional[Any] = None
@@ -247,9 +352,21 @@ class VectorStore:
         """文本向量化"""
         if self._embedding_fn is not None:
             return self._embedding_fn(texts)
-        model = self._get_embedding_model()
-        embeddings = model.encode(texts, normalize_embeddings=True, show_progress_bar=False)
-        return embeddings.tolist()
+        if self.embedding_backend in {"fallback", "mock", "deterministic"}:
+            return deterministic_embedding(texts)
+        try:
+            model = self._get_embedding_model()
+            embeddings = model.encode(texts, normalize_embeddings=True, show_progress_bar=False)
+            self.embedding_backend = "sentence_transformers"
+            return embeddings.tolist()
+        except Exception as e:
+            if self.allow_fallback_embedding and self.embedding_backend == "auto":
+                if not self._fallback_warned:
+                    logger.warning(f"真实 embedding 不可用，使用 deterministic fallback: {e}")
+                    self._fallback_warned = True
+                self.embedding_backend = "fallback"
+                return deterministic_embedding(texts)
+            raise
 
     def add_documents(
         self,
@@ -446,3 +563,14 @@ class VectorStore:
         if ids:
             self.collection.delete(ids=ids)
             logger.info(f"已清空集合，删除 {len(ids)} 条记录")
+
+    def reset_collection(self) -> None:
+        """删除并重建集合，用于复跑索引时重置向量维度。"""
+        try:
+            self.client.delete_collection(name=self.collection_name)
+        except Exception:
+            pass
+        self.collection = self.client.get_or_create_collection(
+            name=self.collection_name,
+            metadata={"hnsw:space": "cosine"},
+        )

@@ -1,0 +1,37 @@
+{
+  "metadata": {
+    "batch_id": "regression_fail",
+    "sample_count": 6800,
+    "risk_sample_count": 5300,
+    "recent_f1": 0.887,
+    "description": "触发模型重训后，在回归测试阶段失败并阻断发布的演示批次。",
+    "scenario": "REGRESSION_FAIL",
+    "tags": ["regression", "demo_iteration", "retrain"]
+  },
+  "gates": {
+    "regression": {
+      "status": "PASS",
+      "baseline_f1": 0.874,
+      "candidate_f1": 0.812
+    },
+    "drift": {
+      "risk_level": "LOW",
+      "psi": 0.12,
+      "threshold": 0.25
+    }
+  },
+  "records": [
+    {
+      "enterprise_id": "DEMO-REGFAIL-001",
+      "risk_level": "red",
+      "risk_items": 16,
+      "unrectified_troubles": 4
+    },
+    {
+      "enterprise_id": "DEMO-REGFAIL-002",
+      "risk_level": "orange",
+      "risk_items": 11,
+      "unrectified_troubles": 5
+    }
+  ]
+}

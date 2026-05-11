@@ -1,0 +1,39 @@
+{
+  "metadata": {
+    "batch_id": "regression_block",
+    "sample_count": 6800,
+    "risk_sample_count": 5300,
+    "recent_f1": 0.887,
+    "description": "候选新模型在回归测试中退化，回归门禁阻断发布。",
+    "scenario": "REGRESSION_BLOCK",
+    "tags": ["regression", "blocked"]
+  },
+  "gates": {
+    "regression": {
+      "status": "DEGRADED",
+      "baseline_f1": 0.874,
+      "candidate_f1": 0.812,
+      "min_f1": 0.85,
+      "reason": "candidate model F1 below release threshold"
+    },
+    "drift": {
+      "risk_level": "LOW",
+      "psi": 0.12,
+      "threshold": 0.25
+    }
+  },
+  "records": [
+    {
+      "enterprise_id": "DEMO-REG-001",
+      "risk_level": "red",
+      "risk_items": 16,
+      "unrectified_troubles": 4
+    },
+    {
+      "enterprise_id": "DEMO-REG-002",
+      "risk_level": "orange",
+      "risk_items": 11,
+      "unrectified_troubles": 5
+    }
+  ]
+}

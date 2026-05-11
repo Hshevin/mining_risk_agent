@@ -168,6 +168,19 @@ def _push_node_status(state: AgentState, node: str, status: str, detail: str = "
     })
 
 
+def _dump_validation_evidence(value: Any) -> List[Dict[str, Any]]:
+    """兼容 Pydantic Evidence、dict 和测试里的 MagicMock。"""
+    if not isinstance(value, list):
+        return []
+    output = []
+    for item in value:
+        if hasattr(item, "model_dump"):
+            output.append(item.model_dump())
+        elif isinstance(item, dict):
+            output.append(item)
+    return output
+
+
 def _get_project_base() -> Path:
     return Path(__file__).resolve().parent.parent
 
@@ -411,6 +424,10 @@ async def node_decision_generation(state: AgentState, scenario: ScenarioConfig) 
             vr = march_result["validation_result"]
             march_passed = vr.pass_ if hasattr(vr, "pass_") else vr.get("pass_", False)
             march_reason = vr.reason if hasattr(vr, "reason") else vr.get("reason", "")
+            march_evidence = _dump_validation_evidence(getattr(vr, "evidence", []))
+            march_supporting_evidence = _dump_validation_evidence(
+                getattr(vr, "supporting_evidence", [])
+            )
 
             if march_passed:
                 break
@@ -436,6 +453,8 @@ async def node_decision_generation(state: AgentState, scenario: ScenarioConfig) 
             "passed": march_passed,
             "reason": march_reason,
             "retry_count": retry_count,
+            "evidence": march_evidence,
+            "supporting_evidence": march_supporting_evidence,
         }
 
         if not march_passed:
