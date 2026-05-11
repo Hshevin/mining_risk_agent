@@ -201,7 +201,11 @@ python -c "from iteration.monitor import ModelMonitor; ModelMonitor().should_ret
 
 ```bash
 cd mining_risk_agent
+<<<<<<< HEAD
 cp .env.example .env       # 可选：设置 LLM_PROVIDER、LLM API Key、MRA_ADMIN_TOKEN 等
+=======
+cp .env.example .env       # 可选：填入 GLM5_API_KEY / OPENAI_API_KEY
+>>>>>>> e7cc200 (some changes)
 docker compose up -d --build
 ```
 
@@ -214,7 +218,11 @@ docker compose up -d --build
 **Docker 服务说明：**
 | 服务 | 镜像 | 容器名 | 端口映射 | 说明 |
 |------|------|--------|----------|------|
+<<<<<<< HEAD
 | api | `mining-risk-agent-api` | `mining_risk_api` | `127.0.0.1:8000:8000` | FastAPI + Uvicorn（Python 3.10-slim，仅本机直连） |
+=======
+| api | `mining-risk-agent-api` | `mining_risk_api` | `8000:8000` | FastAPI + Uvicorn（Python 3.10-slim） |
+>>>>>>> e7cc200 (some changes)
 | frontend | `mining-risk-agent-frontend` | `mining_risk_frontend` | `8501:80` | React/Vite SPA（多阶段：node:20-alpine 构建 → nginx:alpine 托管 + 反向代理 `/api`、`/health`、`/docs` 至 `api`） |
 
 > **架构提示**：前端容器内 Nginx 监听 80 端口，把 `/api/*`、`/health`、`/docs`、`/redoc`、`/openapi.json` 反向代理至 `http://api:8000`，并关闭 `proxy_buffering` 以保留 SSE 流式节点输出；浏览器只与前端同源通信，从而避免 CORS 与跨域 Cookie 问题。详见 `mining_risk_agent/frontend/nginx.conf`。
@@ -1031,7 +1039,11 @@ mining_risk_agent/
 │   ├── 风险事件归档.md
 │   ├── 处置经验归档.md
 │   └── 系统日志归档.md
+<<<<<<< HEAD
 ├── config.yaml           # 全局配置（含 llm.provider / llm.providers + scenarios 配置节）
+=======
+├── config.yaml           # 全局配置（含 llm.glm5 + scenarios 配置节）
+>>>>>>> e7cc200 (some changes)
 ├── requirements.txt      # 后端 API 精简运行时依赖（Docker 默认）
 ├── requirements-api.txt  # requirements.txt 的别名，便于 CI/文档引用
 ├── requirements-ml.txt   # 训练 / SHAP / XGBoost / LightGBM / CatBoost / TensorFlow

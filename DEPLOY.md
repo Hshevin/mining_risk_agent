@@ -42,12 +42,17 @@ newgrp docker
 ```bash
 cd mining_risk_agent
 cp .env.example .env
+<<<<<<< HEAD
 # 按需设置 LLM_PROVIDER，并填写 LLM_API_KEY 或 config.yaml 中对应 provider 的 api_key_env。
 # 为空时后端自动走 Mock 降级。
 # 设置 MRA_ADMIN_TOKEN 保护 LLM 配置、知识库写入、审计查询、模型迭代等管理接口。
 # 生产环境建议设置 MRA_ENABLE_MOCK_FALLBACK=false，使决策故障返回 503 而不是 Mock。
 # 生产环境请将 MRA_CORS_ORIGINS 收窄为真实前端 Origin。
 # API_REQUIREMENTS_FILE 默认是 requirements-deploy.txt（API + 当前模型推理依赖）。
+=======
+# 按需填写 GLM5_API_KEY 或 OPENAI_API_KEY；为空时后端自动走 Mock 降级。
+# API_REQUIREMENTS_FILE 默认是 requirements.txt（精简 API 依赖）。
+>>>>>>> e7cc200 (some changes)
 # 如需把训练/RAG/旧 Streamlit 依赖也打进后端镜像，可改为 requirements-full.txt。
 ```
 
@@ -59,9 +64,15 @@ docker compose up -d --build
 ```
 
 首次构建会下载 Python / Node / Nginx 基础镜像并安装依赖（约 5 ~ 15 分钟，取决于网络）。
+<<<<<<< HEAD
 `docker-compose.yml` 默认通过 `API_REQUIREMENTS_FILE=requirements-deploy.txt` 安装 API 与当前
 Stacking pkl 推理依赖；如需 RAG/长期记忆依赖可改为 `requirements-deploy-rag.txt`，完整训练与旧
 Streamlit 依赖使用 `requirements-full.txt`。
+=======
+后端 Dockerfile 默认只安装 `requirements.txt` 中的 API 运行时依赖，不再安装
+Streamlit、Plotly、TensorFlow、PyTorch、ChromaDB、sentence-transformers 等重依赖；
+因此后端服务镜像会明显小于完整研发环境镜像。
+>>>>>>> e7cc200 (some changes)
 
 ### 4. 验证部署
 
@@ -152,6 +163,7 @@ server {
 }
 ```
 
+<<<<<<< HEAD
 ### 4.2 CORS 与管理接口
 
 后端 `api/main.py` 通过 `MRA_CORS_ORIGINS` 配置 CORS 白名单，默认只包含本地前端地址。
@@ -160,6 +172,13 @@ server {
 LLM 配置、知识库写入、审计查询和模型迭代等管理接口需要请求头 `X-Admin-Token`，值来自
 `MRA_ADMIN_TOKEN`。不要把生产 Token 编译进公开前端包；管理操作应走受控内网客户端或临时本地管理页面。
 本地路演如确需无鉴权操作，可临时设置 `MRA_ALLOW_UNAUTHENTICATED_ADMIN=true`。
+=======
+### 4.2 CORS
+
+后端 `api/main.py` 当前 `allow_origins=["*"]`，开发期方便。
+生产环境如果要把前端容器放在另一个域名/反向代理后，请把 `allow_origins`
+收窄为前端真实 Origin。
+>>>>>>> e7cc200 (some changes)
 
 ### 4.3 数据持久化
 
@@ -202,16 +221,28 @@ tar czf backup/kb_$(date +%Y%m%d).tar.gz data/agentfs_git knowledge_base
 |---|---|
 | 前端 502 / 网关错误 | `docker compose logs api` 看 Uvicorn 是否就绪；`api` healthcheck 是否 healthy |
 | `/api/v1/agent/decision/stream` 卡住 | 反向代理的 `proxy_buffering` 是否关闭、`proxy_read_timeout` 是否够长 |
+<<<<<<< HEAD
 | LLM 请求 401 | `.env` 中 `LLM_PROVIDER` 是否对应 `llm.providers`，`LLM_API_KEY` 或 provider 的 `api_key_env` 是否已注入 compose |
 | 管理接口 401/503 | 检查 `MRA_ADMIN_TOKEN` 是否设置，并在请求中提供 `X-Admin-Token`；本地演示可临时启用 `MRA_ALLOW_UNAUTHENTICATED_ADMIN=true` |
+=======
+| GLM-5 / OpenAI 请求 401 | `.env` 中 `GLM5_API_KEY` / `OPENAI_API_KEY` 是否已注入 compose |
+>>>>>>> e7cc200 (some changes)
 | 模型未训练 → 返回 Mock | 把训练好的 `.pkl` 放入 `models/`，或先跑 `scripts/train.py` |
 | 知识库为空 | 确认 `knowledge_base/` 目录中存在 `.md` 文件，或重新挂载 |
 
 ## 七、安全建议
 
+<<<<<<< HEAD
 1. 生产环境不要把 8000 端口直接暴露到公网；当前 compose 已将 8000 绑定到 `127.0.0.1`，前端只走 8501 → 反向代理 → 443。
 2. 启用 HTTPS（Let's Encrypt / 商业证书）。
 3. 把 `MRA_CORS_ORIGINS` 设为前端真实域名而非 `*`。
 4. `.env` 文件不要提交到 Git，也不要打进镜像；`.dockerignore` 已排除 `.env` 与 `.env.*`。
 5. 为 `MRA_ADMIN_TOKEN` 使用强随机值，并避免把生产 Token 暴露给浏览器端代码。
 6. 定期回查 `data/audit.db`，巡检 `iteration` 触发与审批历史。
+=======
+1. 生产环境不要把 8000 端口直接暴露到公网；前端只走 8501 → 反向代理 → 443。
+2. 启用 HTTPS（Let's Encrypt / 商业证书）。
+3. 把 `allow_origins` 设为前端真实域名而非 `*`。
+4. `.env` 文件不要提交到 Git（`.env.example` 已提供模板）。
+5. 定期回查 `data/audit.db`，巡检 `iteration` 触发与审批历史。
+>>>>>>> e7cc200 (some changes)

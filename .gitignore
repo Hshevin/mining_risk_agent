@@ -28,3 +28,8 @@ frontend/*.tsbuildinfo
 
 # OS files
 .DS_Store
+
+*.pyc
+*/__pycache__/*
+*.log
+.vscode

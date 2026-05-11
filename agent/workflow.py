@@ -369,6 +369,7 @@ async def node_decision_generation(state: AgentState, scenario: ScenarioConfig) 
         )
 
         config = get_config()
+<<<<<<< HEAD
         llm_cfg = config.llm.active
         client = OpenAICompatibleClient(
             api_key=llm_cfg.api_key or None,
@@ -384,6 +385,15 @@ async def node_decision_generation(state: AgentState, scenario: ScenarioConfig) 
             temperature=llm_cfg.default_temperature,
             max_tokens=llm_cfg.default_max_tokens,
         )
+=======
+        llm_cfg = config.llm.glm5
+        client = GLM5Client(
+            api_key=llm_cfg.api_key or None,
+            base_url=llm_cfg.base_url or None,
+            model=llm_cfg.model or None,
+        )
+        decision = await client.generate_json(prompt, temperature=llm_cfg.default_temperature)
+>>>>>>> e7cc200 (some changes)
         state["decision"] = decision
 
         # ------------------------------------------------------------------
