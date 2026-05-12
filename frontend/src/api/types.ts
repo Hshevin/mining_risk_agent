@@ -417,29 +417,42 @@ export interface IterationNextAction {
 }
 
 export interface IterationRecord {
-  iteration_id: string;
-  batch_id: string;
-  data_source: IterationDataSource;
-  batch: Record<string, unknown>;
-  sample_count: number;
-  risk_sample_count: number;
-  recent_f1: number;
-  trigger_threshold_samples: number;
-  trigger_threshold_f1: number;
-  thresholds: {
+  id: string;
+  version: string;
+  date: string;
+  status: "draft" | "testing" | "pending_approval" | "approved" | "rejected" | "canary" | "production" | string;
+  f1: number;
+  samples: number;
+  description: string;
+  improvements: string[];
+  technical_details: string;
+  expected_effect: string;
+  approver?: string;
+  approval_comment?: string;
+  approved_at?: string | number;
+  iteration_id?: string;
+  batch_id?: string;
+  data_source?: IterationDataSource;
+  batch?: Record<string, unknown>;
+  sample_count?: number;
+  risk_sample_count?: number;
+  recent_f1?: number;
+  trigger_threshold_samples?: number;
+  trigger_threshold_f1?: number;
+  thresholds?: {
     risk_sample_count?: number;
     recent_f1?: number;
     [key: string]: unknown;
   };
-  triggered: boolean;
-  retrain_required: boolean;
-  trigger_reasons: string[];
-  current_status: string;
-  timeline: IterationTimelineEvent[];
-  report_path: string;
-  next_actions: IterationNextAction[];
-  created_at: string;
-  updated_at: string;
+  triggered?: boolean;
+  retrain_required?: boolean;
+  trigger_reasons?: string[];
+  current_status?: string;
+  timeline?: IterationTimelineEvent[];
+  report_path?: string;
+  next_actions?: IterationNextAction[];
+  created_at?: string | number;
+  updated_at?: string;
   metadata?: Record<string, unknown>;
   demo_mode?: boolean;
   training_report?: Record<string, unknown> | null;

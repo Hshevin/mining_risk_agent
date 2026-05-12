@@ -1,1003 +1,1774 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  downloadMemoryExport,
-  fetchMemoryStatistics,
-  fetchKnowledgeSystemOverview,
-  searchKnowledgeRag,
+  importEnterpriseData,
+  importExcelFile,
+  assessEnterpriseFile,
+  batchRiskAssessment,
+  fetchEnterpriseDataSummary,
+  fetchMemoryStats,
+  fetchWarningExperiences,
+  fetchEnterpriseRiskHistory,
+  fetchApprovals,
+  decideApproval,
+  fetchAuditLogs,
+  exportMemoryData,
+  queryShortTermMemoryPaginated,
+  queryLongTermMemoryPaginated,
+  migrateToLongTerm,
+  deleteShortTermMemory,
 } from "../api/client";
-import type {
-  KnowledgeBaseStatus,
-  KnowledgeRagResult,
-  KnowledgeSystemOverview,
-  MemoryModule,
-  MemoryPriority,
-  MemoryRecord,
-  MemoryStatisticsParams,
-  MemoryStatisticsResponse,
-} from "../api/types";
-import {
-  MemoryBarChart,
-  MemoryDonutChart,
-  MemoryHeatmapChart,
-  MemoryTrendChart,
-} from "../components/charts";
-import ScadaCard from "../components/ScadaCard";
-import Tabs from "../components/Tabs";
+import ReactECharts from "echarts-for-react";
 
-const SECTION_TABS = [
-  { id: "overview", label: "总览" },
-  { id: "kbs", label: "六库状态" },
-  { id: "agentfs", label: "AgentFS 同步" },
-  { id: "rag", label: "RAG 检索" },
-  { id: "memory", label: "记忆系统" },
-  { id: "audit", label: "审计告警" },
-];
-
-const PRESET_QUERIES = [
-  "粉尘涉爆除尘系统异常",
-  "危化品泄漏处置",
-  "冶金煤气报警",
-  "有限空间作业中毒窒息",
-  "合规红线规则",
-  "企业执行条件",
-];
-
-const FALLBACK_OVERVIEW: KnowledgeSystemOverview = {
-  overview: {
-    audit_status: "PASS_WITH_WARNINGS",
-    pass_count: 15,
-    warn_count: 6,
-    fail_count: 0,
-    kb_file_count: 6,
-    rag_chunks: 639,
-    real_public_data_cases: 36,
-    rule_count: 65,
-    agentfs_sync_status: "match",
-    embedding_backend: "fallback",
-  },
-  knowledge_bases: [
-    {
-      filename: "工矿风险预警智能体合规执行书.md",
-      type: "compliance",
-      highlight: "COM 合规红线、上报、停产、撤人、整改和审计规则",
-      agentfs_match: true,
-      rag_chunks: 60,
-      source_commit_short: "2f0819487bda",
-      quality_status: "PASS",
-      summary: "合规规则与审计留痕知识底座。",
-      key_sections: ["合规红线规则表", "必须上报、停产、撤人、整改、复查和数据审计规则"],
-      data_sources: ["安全生产法", "工贸重大事故隐患判定标准", "项目审计规则"],
-    },
-    {
-      filename: "部门分级审核SOP.md",
-      type: "sop",
-      highlight: "分级路由、协同、退回和闭环 SOP",
-      agentfs_match: true,
-      rag_chunks: 54,
-      source_commit_short: "2f0819487bda",
-      quality_status: "PASS",
-      summary: "监管部门分级审核和闭环流程知识库。",
-      key_sections: ["分级路由、协同、退回和闭环 SOP 表", "机器可读摘要"],
-      data_sources: ["部门/人员公开字段", "项目 SOP"],
-    },
-    {
-      filename: "工业物理常识及传感器时间序列逻辑.md",
-      type: "physics",
-      highlight: "PHY 工况逻辑、传感器时间序列和场景阈值",
-      agentfs_match: true,
-      rag_chunks: 62,
-      source_commit_short: "2f0819487bda",
-      quality_status: "PASS",
-      summary: "粉尘、危化、冶金、有限空间工况逻辑知识库。",
-      key_sections: ["数据来源与事实边界", "工况逻辑和时间序列规则表"],
-      data_sources: ["公开字段映射", "传感器逻辑规则", "国家/行业标准"],
-    },
-    {
-      filename: "企业已具备的执行条件.md",
-      type: "conditions",
-      highlight: "公开数据重建的企业执行条件事实库",
-      agentfs_match: true,
-      rag_chunks: 221,
-      source_commit_short: "2f0819487bda",
-      quality_status: "PASS",
-      summary: "人员、设备、资质、隐患、处罚、行业和位置等条件摘要。",
-      key_sections: ["公开数据统计", "粉尘涉爆执行条件", "冶金执行条件", "危化品执行条件"],
-      data_sources: ["public_data_inventory.json", "public_data_field_mapping.csv"],
-    },
-    {
-      filename: "类似事故处理案例.md",
-      type: "cases",
-      highlight: "36 个真实公开数据 B/C/D 类案例",
-      agentfs_match: true,
-      rag_chunks: 216,
-      source_commit_short: "2f0819487bda",
-      quality_status: "PASS",
-      summary: "隐患闭环、行政处罚、风险组合案例卡片。",
-      key_sections: ["重大隐患与未整改闭环案例", "行政处罚案例", "高风险企业风险组合案例"],
-      data_sources: ["accident_cases_kb_rebuild_run.json", "公开检查/隐患/处罚/风险表"],
-    },
-    {
-      filename: "预警历史经验与短期记忆摘要.md",
-      type: "history_memory",
-      highlight: "预警历史经验与短期记忆摘要",
-      agentfs_match: true,
-      rag_chunks: 9,
-      source_commit_short: "2f0819487bda",
-      quality_status: "PASS",
-      summary: "保留历史经验摘要和记忆归档入口。",
-      key_sections: ["历史经验摘要", "短期记忆摘要"],
-      data_sources: ["memory/*.md", "AgentFS memory archive"],
-    },
-  ],
-  agentfs: {
-    snapshot_commit_id: "2f0819487bdaf2a8495f15c260015cbf932d29d3",
-    snapshot_commit_short: "2f0819487bda",
-    fs_agentfs_match: true,
-    backup_path: "data/snapshots/agentfs_pre_kb_sync_20260510_175314.db",
-    deprecated_entries: [
-      { path: "/knowledge_base/预警历史经验与短期记忆摘?md", status_note: "deprecated_malformed_path" },
-    ],
-    deprecated_warning: "deprecated 乱码路径仍保留，按审计要求不在本轮删除",
-    sync_script_name: "scripts/sync_kb_to_agentfs.py",
-    db_path: "data/agentfs.db",
-    agent_id: "kb_sync",
-  },
-  rag_index: {
-    persist_directory: "data/chroma_db",
-    collection_name: "knowledge_base",
-    collection_count: 639,
-    embedding_backend: "fallback",
-    fallback_embedding_used: true,
-    source_commit_short: "2f0819487bda",
-  },
-  memory_archives: [
-    { path: "memory/风险事件归档.md", priority: "P1", strategy: "摘要归档", description: "沉淀已核验的风险事件摘要和复查线索。" },
-    { path: "memory/核心指令归档.md", priority: "P0", strategy: "永久保留", description: "保存系统边界、禁止项和核心运行约束。" },
-    { path: "memory/处置经验归档.md", priority: "P1", strategy: "摘要归档", description: "归档经过复盘的处置经验和现场操作注意事项。" },
-    { path: "memory/系统日志归档.md", priority: "P2", strategy: "压缩保留", description: "保存可压缩的系统运行摘要和审计索引。" },
-  ],
-  audit_warnings: [
-    "AgentFS deprecated 乱码路径仍保留",
-    "当前仍使用 fallback embedding/reranker",
-    "本地公开数据无法确认 A 类真实事故详案",
-    "法条编号/标准条款需法务复核",
-    "阈值需按企业设备/SDS/SOP 校准",
-    "部门真实联系人仍需部署配置",
-  ],
+const PRIO_COLORS: Record<string, string> = { P0: "#ef4444", P1: "#f97316", P2: "#3b82f6", P3: "#10b981" };
+const PRIO_BG: Record<string, string> = { P0: "rgba(239,68,68,0.15)", P1: "rgba(249,115,22,0.15)", P2: "rgba(59,130,246,0.15)", P3: "rgba(16,185,129,0.15)" };
+const LEVEL_COLORS: Record<string, string> = { 红: "#ef4444", 橙: "#f97316", 黄: "#eab308", 蓝: "#3b82f6" };
+const LEVEL_BG: Record<string, string> = { 红: "rgba(239,68,68,0.12)", 橙: "rgba(249,115,22,0.12)", 黄: "rgba(234,179,8,0.12)", 蓝: "rgba(59,130,246,0.12)" };
+const CAT_LABELS: Record<string, string> = {
+  inference: "推理过程", warning: "预警记录", experience: "预警经验", context: "上下文",
+  enterprise_data: "企业数据", knowledge: "知识库", regulation: "法规标准",
+  accident_case: "事故案例", warning_experience: "预警经验",
+};
+const CAT_COLORS: Record<string, string> = {
+  inference: "#3b82f6", warning: "#ef4444", experience: "#8b5cf6", context: "#64748b",
+  enterprise_data: "#10b981", knowledge: "#06b6d4", regulation: "#f59e0b",
+  accident_case: "#f97316", warning_experience: "#ec4899",
 };
 
-const DEMO_RAG_RESULTS: KnowledgeRagResult[] = [
-  {
-    source_file: "knowledge_base/企业已具备的执行条件.md",
-    section_title: "粉尘涉爆执行条件",
-    rule_id: "",
-    sop_id: "",
-    case_id: "",
-    doc_type: "conditions",
-    distance: 0.18,
-    score: 0.82,
-    matched_text: "企业存在粉尘涉爆标识、粉尘类型、干/湿式除尘系统数量、涉粉作业人数或除尘清扫记录任一证据，即纳入粉尘涉爆场景。",
-  },
-  {
-    source_file: "knowledge_base/工业物理常识及传感器时间序列逻辑.md",
-    section_title: "工况逻辑和时间序列规则表",
-    rule_id: "PHY-DUST-002",
-    sop_id: "",
-    case_id: "",
-    doc_type: "physics",
-    distance: 0.24,
-    score: 0.76,
-    matched_text: "除尘系统压差、电流和粉尘浓度必须相互解释；粉尘浓度上升叠加风机电流下降或压差异常，应核查风机、滤袋、清灰和管道堵塞。",
-  },
-  {
-    source_file: "knowledge_base/类似事故处理案例.md",
-    section_title: "高风险企业风险组合案例",
-    rule_id: "",
-    sop_id: "",
-    case_id: "D-008",
-    doc_type: "cases",
-    distance: 0.31,
-    score: 0.69,
-    matched_text: "粉尘涉爆风险组合：可燃性粉尘爆炸；风险点包含湿式除尘器，来源为公开数据风险表。",
-  },
-];
+interface EnterpriseRiskResult {
+  enterprise_id: string;
+  enterprise_name: string;
+  risk_score: number;
+  risk_level: string;
+  scenario: string;
+  assessment_time: string;
+  key_factors: Array<{ name: string; value: number; color: string }>;
+  inference_stored: boolean;
+}
 
-const MEMORY_RULES = [
-  { priority: "P0", mechanism: "永久保留", lifecycle: "核心指令、边界条件、不可覆盖约束" },
-  { priority: "P1", mechanism: "摘要归档", lifecycle: "高价值风险事件、复盘经验、可追溯摘要" },
-  { priority: "P2", mechanism: "压缩", lifecycle: "运行日志、普通检索上下文、可再生成材料" },
-  { priority: "P3", mechanism: "最先删除", lifecycle: "临时提示、中间草稿、低价值缓存" },
-];
+function StatCard({ value, label, color, icon }: { value: number; label: string; color: string; icon?: string }) {
+  return (
+    <div className="scada-card" style={{ textAlign: "center", padding: 16, position: "relative", overflow: "hidden" }}>
+      <div style={{ position: "absolute", top: -10, right: -10, fontSize: 40, opacity: 0.08, color }}>{icon || "📊"}</div>
+      <div style={{ fontSize: 28, fontWeight: 800, color, fontFamily: "JetBrains Mono", position: "relative" }}>{value.toLocaleString()}</div>
+      <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 4, position: "relative" }}>{label}</div>
+    </div>
+  );
+}
+
+function ExportDialog({ memoryType, onClose }: { memoryType: string; onClose: () => void }) {
+  const [format, setFormat] = useState("xlsx");
+  const [timeFrom, setTimeFrom] = useState("");
+  const [timeTo, setTimeTo] = useState("");
+  const [filterCategory, setFilterCategory] = useState("");
+  const [filterPriority, setFilterPriority] = useState("");
+  const [filterEnterprise, setFilterEnterprise] = useState("");
+  const [exporting, setExporting] = useState(false);
+  const [msg, setMsg] = useState("");
+
+  const handleExport = useCallback(async () => {
+    setExporting(true);
+    setMsg("正在导出...");
+    const payload: any = { memory_type: memoryType, format };
+    if (timeFrom) payload.time_from = new Date(timeFrom).getTime() / 1000;
+    if (timeTo) payload.time_to = new Date(timeTo).getTime() / 1000;
+    const filters: Record<string, any> = {};
+    if (filterCategory) filters.category = filterCategory;
+    if (filterPriority) filters.priority = filterPriority;
+    if (filterEnterprise) filters.enterprise_id = filterEnterprise;
+    if (Object.keys(filters).length > 0) payload.filters = filters;
+    const blob = await exportMemoryData(payload);
+    if (!blob) { setMsg("❌ 导出失败"); setExporting(false); return; }
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${memoryType}_export_${new Date().toISOString().slice(0, 10)}.${format}`;
+    a.click();
+    URL.revokeObjectURL(url);
+    setMsg("✅ 导出成功");
+    setExporting(false);
+  }, [format, timeFrom, timeTo, filterCategory, filterPriority, filterEnterprise, memoryType]);
+
+  const typeLabel = memoryType === "short" ? "短期记忆" : memoryType === "long" ? "长期记忆" : "预警经验";
+
+  return (
+    <div className="scada-card" style={{ marginBottom: 14, border: "1px solid #3b82f6" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+        <div className="risk-report-title">📤 导出 {typeLabel}</div>
+        <button className="scada-btn secondary" style={{ fontSize: 11, padding: "2px 8px" }} type="button" onClick={onClose}>✕ 关闭</button>
+      </div>
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end" }}>
+        <div>
+          <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 4 }}>导出格式</div>
+          <select className="scada-input" value={format} onChange={(e) => setFormat(e.target.value)} style={{ width: 120 }}>
+            <option value="xlsx">Excel (.xlsx)</option>
+            <option value="csv">CSV (.csv)</option>
+            <option value="pdf">PDF (.pdf)</option>
+          </select>
+        </div>
+        <div>
+          <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 4 }}>起始时间</div>
+          <input className="scada-input" type="date" value={timeFrom} onChange={(e) => setTimeFrom(e.target.value)} style={{ width: 150 }} />
+        </div>
+        <div>
+          <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 4 }}>截止时间</div>
+          <input className="scada-input" type="date" value={timeTo} onChange={(e) => setTimeTo(e.target.value)} style={{ width: 150 }} />
+        </div>
+        <div>
+          <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 4 }}>分类筛选</div>
+          <select className="scada-input" value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)} style={{ width: 120 }}>
+            <option value="">全部分类</option>
+            <option value="inference">推理过程</option>
+            <option value="warning">预警记录</option>
+            <option value="experience">预警经验</option>
+            <option value="context">上下文</option>
+            <option value="enterprise_data">企业数据</option>
+            <option value="knowledge">知识库</option>
+            <option value="regulation">法规标准</option>
+            <option value="accident_case">事故案例</option>
+            <option value="warning_experience">预警经验</option>
+          </select>
+        </div>
+        <div>
+          <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 4 }}>优先级</div>
+          <select className="scada-input" value={filterPriority} onChange={(e) => setFilterPriority(e.target.value)} style={{ width: 100 }}>
+            <option value="">全部</option>
+            <option value="P0">P0</option>
+            <option value="P1">P1</option>
+            <option value="P2">P2</option>
+            <option value="P3">P3</option>
+          </select>
+        </div>
+        <div>
+          <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 4 }}>企业ID</div>
+          <input className="scada-input" placeholder="输入企业ID..." value={filterEnterprise} onChange={(e) => setFilterEnterprise(e.target.value)} style={{ width: 130 }} />
+        </div>
+        <button className="scada-btn" type="button" onClick={handleExport} disabled={exporting}>{exporting ? "导出中..." : "📥 执行导出"}</button>
+      </div>
+      {msg && <div className={`alert ${msg.includes("✅") ? "success" : msg.includes("❌") ? "error" : "info"}`} style={{ marginTop: 10 }}>{msg}</div>}
+    </div>
+  );
+}
 
 export default function KnowledgeMemoryPage() {
-  const [activeTab, setActiveTab] = useState("overview");
-  const [system, setSystem] = useState<KnowledgeSystemOverview>(FALLBACK_OVERVIEW);
-  const [selectedKbName, setSelectedKbName] = useState(FALLBACK_OVERVIEW.knowledge_bases[0].filename);
-  const [query, setQuery] = useState(PRESET_QUERIES[0]);
-  const [ragResults, setRagResults] = useState<KnowledgeRagResult[]>(DEMO_RAG_RESULTS);
-  const [ragMode, setRagMode] = useState("demo");
-  const [ragLoading, setRagLoading] = useState(false);
-  const [memoryStats, setMemoryStats] = useState<MemoryStatisticsResponse | null>(null);
-  const [memoryLoading, setMemoryLoading] = useState(false);
-  const [memoryError, setMemoryError] = useState("");
-  const [memoryModule, setMemoryModule] = useState<MemoryModule>("all");
-  const [memoryPriority, setMemoryPriority] = useState<MemoryPriority | "">("");
-  const [memoryKeyword, setMemoryKeyword] = useState("");
-  const [memoryStart, setMemoryStart] = useState("");
-  const [memoryEnd, setMemoryEnd] = useState("");
-  const [memoryRiskType, setMemoryRiskType] = useState("");
-  const [memoryOffset, setMemoryOffset] = useState(0);
-  const memoryLimit = 25;
+  const [activeSection, setActiveSection] = useState<"overview" | "data" | "risk" | "import" | "short" | "long" | "experience" | "approval" | "audit">("overview");
 
-  useEffect(() => {
-    fetchKnowledgeSystemOverview().then((payload) => {
-      if (!payload) return;
-      setSystem(payload);
-      if (payload.knowledge_bases.length > 0) {
-        setSelectedKbName(payload.knowledge_bases[0].filename);
-      }
-    });
-  }, []);
-
-  useEffect(() => {
-    if (activeTab !== "memory") return;
-    let cancelled = false;
-    const params: MemoryStatisticsParams = {
-      module: memoryModule,
-      priority: memoryPriority,
-      keyword: memoryKeyword,
-      start_time: memoryStart,
-      end_time: memoryEnd,
-      risk_type: memoryRiskType,
-      limit: memoryLimit,
-      offset: memoryOffset,
-    };
-    async function load(refresh = false) {
-      setMemoryLoading(true);
-      const payload = await fetchMemoryStatistics({ ...params, refresh });
-      if (cancelled) return;
-      if (payload) {
-        setMemoryStats(payload);
-        setMemoryError("");
-      } else {
-        setMemoryError("记忆统计接口暂不可用");
-      }
-      setMemoryLoading(false);
-    }
-    load(false);
-    const timer = window.setInterval(() => load(true), 30000);
-    return () => {
-      cancelled = true;
-      window.clearInterval(timer);
-    };
-  }, [
-    activeTab,
-    memoryModule,
-    memoryPriority,
-    memoryKeyword,
-    memoryStart,
-    memoryEnd,
-    memoryRiskType,
-    memoryOffset,
-  ]);
-
-  const selectedKb = useMemo(
-    () =>
-      system.knowledge_bases.find((item) => item.filename === selectedKbName) ??
-      system.knowledge_bases[0],
-    [selectedKbName, system.knowledge_bases],
-  );
-
-  async function runRagSearch(nextQuery = query) {
-    const trimmed = nextQuery.trim();
-    if (!trimmed) {
-      setRagResults(DEMO_RAG_RESULTS);
-      setRagMode("demo");
-      return;
-    }
-    setQuery(trimmed);
-    setRagLoading(true);
-    const payload = await searchKnowledgeRag(trimmed, 6);
-    if (payload && payload.results.length > 0) {
-      setRagResults(payload.results);
-      setRagMode(payload.mode || "chroma");
-    } else {
-      setRagResults(DEMO_RAG_RESULTS);
-      setRagMode("demo");
-    }
-    setRagLoading(false);
-  }
-
-  return (
-    <div className="knowledge-page">
-      <div className="section-title">知识库与记忆系统</div>
-      <Tabs tabs={SECTION_TABS} active={activeTab} onChange={setActiveTab} />
-
-      {activeTab === "overview" && <OverviewPanel system={system} />}
-      {activeTab === "kbs" && (
-        <KnowledgeBasePanel
-          items={system.knowledge_bases}
-          selected={selectedKb}
-          onSelect={setSelectedKbName}
-        />
-      )}
-      {activeTab === "agentfs" && <AgentFSPanel system={system} />}
-      {activeTab === "rag" && (
-        <RagPanel
-          query={query}
-          onQueryChange={setQuery}
-          onSearch={runRagSearch}
-          results={ragResults}
-          loading={ragLoading}
-          mode={ragMode}
-          system={system}
-        />
-      )}
-      {activeTab === "memory" && (
-        <MemoryPanel
-          stats={memoryStats}
-          loading={memoryLoading}
-          error={memoryError}
-          filters={{
-            module: memoryModule,
-            priority: memoryPriority,
-            keyword: memoryKeyword,
-            start: memoryStart,
-            end: memoryEnd,
-            riskType: memoryRiskType,
-            offset: memoryOffset,
-            limit: memoryLimit,
-          }}
-          onFilterChange={(patch) => {
-            if (patch.module !== undefined) setMemoryModule(patch.module);
-            if (patch.priority !== undefined) setMemoryPriority(patch.priority);
-            if (patch.keyword !== undefined) setMemoryKeyword(patch.keyword);
-            if (patch.start !== undefined) setMemoryStart(patch.start);
-            if (patch.end !== undefined) setMemoryEnd(patch.end);
-            if (patch.riskType !== undefined) setMemoryRiskType(patch.riskType);
-            if (patch.offset !== undefined) setMemoryOffset(patch.offset);
-            if (patch.offset === undefined) setMemoryOffset(0);
-          }}
-        />
-      )}
-      {activeTab === "audit" && <AuditPanel system={system} />}
-    </div>
-  );
-}
-
-function OverviewPanel({ system }: { system: KnowledgeSystemOverview }) {
-  const overview = system.overview;
   return (
     <div>
-      <div className="row cols-4">
-        <ScadaCard
-          title="审计状态"
-          value={<span className="compact-card-value">{overview.audit_status}</span>}
-          sub={`PASS/WARN/FAIL ${overview.pass_count}/${overview.warn_count}/${overview.fail_count}`}
-          glowClass="glow-yellow"
-        />
-        <ScadaCard title="知识库文件数" value={overview.kb_file_count} sub="六个主知识库" glowClass="glow-green" />
-        <ScadaCard title="RAG chunks" value={overview.rag_chunks} sub={system.rag_index.collection_name} glowClass="glow-blue" />
-        <ScadaCard title="公开数据案例" value={overview.real_public_data_cases} sub="真实公开数据 B/C/D 类" glowClass="glow-green" />
+      <div className="section-title">📚 预警经验管理系统</div>
+      <div className="sub-tab-bar">
+        {[
+          { key: "overview" as const, label: "📊 总览仪表盘" },
+          { key: "data" as const, label: "📊 数据管理" },
+          { key: "risk" as const, label: "🎯 风险评估" },
+          { key: "import" as const, label: "📥 导入预测" },
+          { key: "experience" as const, label: "⚡ 预警经验" },
+          { key: "short" as const, label: "🧠 短期记忆" },
+          { key: "long" as const, label: "💾 长期记忆" },
+          { key: "approval" as const, label: "📋 审批管理" },
+          { key: "audit" as const, label: "🔍 审计日志" },
+        ].map((t) => (
+          <button key={t.key} type="button" className={`sub-tab ${activeSection === t.key ? "active" : ""}`} onClick={() => setActiveSection(t.key)}>
+            {t.label}
+          </button>
+        ))}
       </div>
-      <div className="row cols-4" style={{ marginTop: 12 }}>
-        <ScadaCard title="COM/PHY/SOP 规则" value={overview.rule_count} sub="证据型规则" glowClass="glow-white" />
-        <ScadaCard title="AgentFS 同步状态" value={<span className="compact-card-value">{overview.agentfs_sync_status}</span>} sub="FS 与 AgentFS 六库一致" glowClass="glow-green" />
-        <ScadaCard title="Embedding backend" value={<span className="compact-card-value">{overview.embedding_backend}</span>} sub="deterministic fallback" glowClass="glow-orange" />
-        <ScadaCard title="Source commit" value={<span className="compact-card-value">{system.rag_index.source_commit_short || "—"}</span>} sub="RAG / AgentFS snapshot" glowClass="glow-blue" />
-      </div>
-
-      <div className="knowledge-summary-band">
-        <div>
-          <div className="subtitle">当前边界</div>
-          <p>
-            本页只展示知识库、AgentFS、RAG 索引、P0-P3 记忆机制和审计结果。检索演示只读访问现有索引或 Markdown 证据，不触发同步、重建或正文改写。
-          </p>
-        </div>
-        <div>
-          <div className="subtitle">公开数据底座</div>
-          <p>
-            公开数据全量盘点已完成，企业执行条件库、案例库和三份规则库均已基于公开数据与证据锚点重建。
-          </p>
-        </div>
-      </div>
+      <div className="divider" />
+      {activeSection === "overview" && <OverviewDashboard />}
+      {activeSection === "data" && <DataManagementSection />}
+      {activeSection === "risk" && <RiskVisualizationSection />}
+      {activeSection === "import" && <ExcelImportSection />}
+      {activeSection === "experience" && <WarningExperienceSection />}
+      {activeSection === "short" && <ShortTermMemorySection />}
+      {activeSection === "long" && <LongTermMemorySection />}
+      {activeSection === "approval" && <ApprovalSection />}
+      {activeSection === "audit" && <AuditLogSection />}
     </div>
   );
 }
 
-function KnowledgeBasePanel({
-  items,
-  selected,
-  onSelect,
-}: {
-  items: KnowledgeBaseStatus[];
-  selected?: KnowledgeBaseStatus;
-  onSelect: (filename: string) => void;
-}) {
+function OverviewDashboard() {
+  const [memStats, setMemStats] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+
+  const loadStats = useCallback(async () => {
+    setLoading(true);
+    const stats = await fetchMemoryStats();
+    if (stats) setMemStats(stats);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { loadStats(); }, [loadStats]);
+
+  const shortTotal = memStats?.short_term?.total ?? 0;
+  const longTotal = memStats?.long_term?.total ?? 0;
+  const weTotal = memStats?.warning_experiences?.total ?? 0;
+  const grandTotal = shortTotal + longTotal + weTotal;
+
+  const combinedTimelineOption = useMemo(() => {
+    const st = memStats?.short_term?.timeline || {};
+    const lt = memStats?.long_term?.timeline || {};
+    const wt = memStats?.warning_experiences?.timeline || {};
+    const allDays = new Set([...Object.keys(st), ...Object.keys(lt), ...Object.keys(wt)]);
+    const sorted = [...allDays].sort();
+    if (!sorted.length) return { backgroundColor: "transparent" };
+    return {
+      backgroundColor: "transparent",
+      tooltip: { trigger: "axis" as const },
+      legend: { data: ["短期记忆", "长期记忆", "预警经验"], textStyle: { color: "#94a3b8", fontSize: 11 }, top: 0 },
+      grid: { left: 55, right: 20, top: 40, bottom: 30 },
+      xAxis: { type: "category" as const, data: sorted.map((d) => d.slice(5)), axisLabel: { color: "#94a3b8", fontSize: 10 } },
+      yAxis: { type: "value" as const, axisLabel: { color: "#94a3b8" }, splitLine: { lineStyle: { color: "#1e293b" } } },
+      dataZoom: [{ type: "inside", start: 0, end: 100 }, { type: "slider", start: 0, end: 100, height: 20, bottom: 5, borderColor: "#334155", backgroundColor: "#0f172a", dataBackground: { lineStyle: { color: "#334155" }, areaStyle: { color: "#1e293b" } }, selectedDataBackground: { lineStyle: { color: "#3b82f6" }, areaStyle: { color: "rgba(59,130,246,0.2)" } }, textStyle: { color: "#94a3b8" } }],
+      series: [
+        { name: "短期记忆", type: "line", data: sorted.map((d) => st[d] || 0), smooth: true, lineStyle: { color: "#3b82f6", width: 2 }, areaStyle: { color: { type: "linear", x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: "rgba(59,130,246,0.25)" }, { offset: 1, color: "rgba(59,130,246,0.02)" }] } }, itemStyle: { color: "#3b82f6" } },
+        { name: "长期记忆", type: "line", data: sorted.map((d) => lt[d] || 0), smooth: true, lineStyle: { color: "#10b981", width: 2 }, areaStyle: { color: { type: "linear", x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: "rgba(16,185,129,0.25)" }, { offset: 1, color: "rgba(16,185,129,0.02)" }] } }, itemStyle: { color: "#10b981" } },
+        { name: "预警经验", type: "line", data: sorted.map((d) => wt[d] || 0), smooth: true, lineStyle: { color: "#8b5cf6", width: 2 }, areaStyle: { color: { type: "linear", x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: "rgba(139,92,246,0.25)" }, { offset: 1, color: "rgba(139,92,246,0.02)" }] } }, itemStyle: { color: "#8b5cf6" } },
+      ],
+    };
+  }, [memStats]);
+
+  const radarOption = useMemo(() => {
+    const st = memStats?.short_term || {};
+    const lt = memStats?.long_term || {};
+    const we = memStats?.warning_experiences || {};
+    const maxVal = Math.max(st.total || 1, lt.total || 1, we.total || 1, 1);
+    return {
+      backgroundColor: "transparent",
+      tooltip: {},
+      legend: { data: ["短期记忆", "长期记忆", "预警经验"], bottom: 0, textStyle: { color: "#94a3b8", fontSize: 10 } },
+      radar: {
+        center: ["50%", "45%"],
+        radius: "60%",
+        indicator: [
+          { name: "总量规模", max: maxVal },
+          { name: "分类多样性", max: 10 },
+          { name: "企业覆盖", max: Math.max(Object.keys(st.by_enterprise || {}).length || 1, Object.keys(lt.by_enterprise || {}).length || 1, 1) },
+          { name: "P0紧急度", max: Math.max(st.by_priority?.P0 || 1, lt.by_priority?.P0 || 1, 1) },
+          { name: "时间跨度(天)", max: Math.max(Object.keys(st.timeline || {}).length || 1, Object.keys(lt.timeline || {}).length || 1, Object.keys(we.timeline || {}).length || 1, 1) },
+        ],
+        axisName: { color: "#94a3b8", fontSize: 10 },
+        splitArea: { areaStyle: { color: ["rgba(59,130,246,0.02)", "rgba(59,130,246,0.02)"] } },
+        splitLine: { lineStyle: { color: "#1e293b" } },
+        axisLine: { lineStyle: { color: "#1e293b" } },
+      },
+      series: [{
+        type: "radar",
+        data: [
+          { value: [st.total || 0, Object.keys(st.by_category || {}).length, Object.keys(st.by_enterprise || {}).length, st.by_priority?.P0 || 0, Object.keys(st.timeline || {}).length], name: "短期记忆", lineStyle: { color: "#3b82f6", width: 2 }, areaStyle: { color: "rgba(59,130,246,0.15)" }, itemStyle: { color: "#3b82f6" } },
+          { value: [lt.total || 0, Object.keys(lt.by_category || {}).length, Object.keys(lt.by_enterprise || {}).length, lt.by_priority?.P0 || 0, Object.keys(lt.timeline || {}).length], name: "长期记忆", lineStyle: { color: "#10b981", width: 2 }, areaStyle: { color: "rgba(16,185,129,0.15)" }, itemStyle: { color: "#10b981" } },
+          { value: [we.total || 0, Object.keys(we.by_scenario || {}).length, 0, we.by_level?.["红"] || 0, Object.keys(we.timeline || {}).length], name: "预警经验", lineStyle: { color: "#8b5cf6", width: 2 }, areaStyle: { color: "rgba(139,92,246,0.15)" }, itemStyle: { color: "#8b5cf6" } },
+        ],
+      }],
+    };
+  }, [memStats]);
+
+  const sunburstOption = useMemo(() => {
+    const stCat = memStats?.short_term?.by_category || {};
+    const ltCat = memStats?.long_term?.by_category || {};
+    const weLvl = memStats?.warning_experiences?.by_level || {};
+    const data: any[] = [];
+    const stChildren = Object.entries(stCat).filter(([, v]) => (v as number) > 0).map(([k, v]) => ({ name: CAT_LABELS[k] || k, value: v as number, itemStyle: { color: CAT_COLORS[k] || "#64748b" } }));
+    const ltChildren = Object.entries(ltCat).filter(([, v]) => (v as number) > 0).map(([k, v]) => ({ name: CAT_LABELS[k] || k, value: v as number, itemStyle: { color: CAT_COLORS[k] || "#64748b" } }));
+    const weChildren = Object.entries(weLvl).filter(([, v]) => (v as number) > 0).map(([k, v]) => ({ name: `${k}级预警`, value: v as number, itemStyle: { color: LEVEL_COLORS[k] || "#64748b" } }));
+    if (stChildren.length) data.push({ name: "短期记忆", itemStyle: { color: "#3b82f6" }, children: stChildren });
+    if (ltChildren.length) data.push({ name: "长期记忆", itemStyle: { color: "#10b981" }, children: ltChildren });
+    if (weChildren.length) data.push({ name: "预警经验", itemStyle: { color: "#8b5cf6" }, children: weChildren });
+    if (!data.length) return { backgroundColor: "transparent" };
+    return {
+      backgroundColor: "transparent",
+      tooltip: { formatter: (p: any) => `${p.name}: ${p.value}条` },
+      series: [{ type: "sunburst", data, radius: ["15%", "85%"], label: { color: "#e5e7eb", fontSize: 11, fontWeight: 600 }, itemStyle: { borderColor: "#0f172a", borderWidth: 2 }, emphasis: { itemStyle: { shadowBlur: 10, shadowColor: "rgba(0,0,0,0.5)" } } }],
+    };
+  }, [memStats]);
+
+  const gaugeOption = useMemo(() => {
+    const p0Total = (memStats?.short_term?.by_priority?.P0 || 0) + (memStats?.long_term?.by_priority?.P0 || 0);
+    const redWarnings = memStats?.warning_experiences?.by_level?.["红"] || 0;
+    return {
+      backgroundColor: "transparent",
+      series: [
+        { type: "gauge", center: ["25%", "55%"], radius: "75%", min: 0, max: Math.max(grandTotal, 1), splitNumber: 5, axisLine: { lineStyle: { width: 8, color: [[0.3, "#10b981"], [0.6, "#f59e0b"], [1, "#ef4444"]] } }, pointer: { length: "60%", width: 4, itemStyle: { color: "#94a3b8" } }, detail: { formatter: "{value}", color: "#f1f5f9", fontSize: 18, fontWeight: 800, offsetCenter: [0, "70%"] }, title: { offsetCenter: [0, "90%"], color: "#94a3b8", fontSize: 10 }, data: [{ value: grandTotal, name: "总记忆量" }] },
+        { type: "gauge", center: ["75%", "55%"], radius: "75%", min: 0, max: Math.max(p0Total + redWarnings, 1), splitNumber: 5, axisLine: { lineStyle: { width: 8, color: [[0.3, "#3b82f6"], [0.6, "#f97316"], [1, "#ef4444"]] } }, pointer: { length: "60%", width: 4, itemStyle: { color: "#94a3b8" } }, detail: { formatter: "{value}", color: "#f1f5f9", fontSize: 18, fontWeight: 800, offsetCenter: [0, "70%"] }, title: { offsetCenter: [0, "90%"], color: "#94a3b8", fontSize: 10 }, data: [{ value: p0Total + redWarnings, name: "紧急事项" }] },
+      ],
+    };
+  }, [memStats, grandTotal]);
+
+  const stackedBarOption = useMemo(() => {
+    const stCat = memStats?.short_term?.by_category || {};
+    const ltCat = memStats?.long_term?.by_category || {};
+    const allCats = new Set([...Object.keys(stCat), ...Object.keys(ltCat)]);
+    const sortedCats = [...allCats].sort();
+    return {
+      backgroundColor: "transparent",
+      tooltip: { trigger: "axis" as const },
+      legend: { data: ["短期记忆", "长期记忆"], textStyle: { color: "#94a3b8", fontSize: 11 }, top: 0 },
+      grid: { left: 60, right: 20, top: 40, bottom: 40 },
+      xAxis: { type: "category" as const, data: sortedCats.map((c) => CAT_LABELS[c] || c), axisLabel: { color: "#94a3b8", fontSize: 10, rotate: 20 } },
+      yAxis: { type: "value" as const, axisLabel: { color: "#94a3b8" }, splitLine: { lineStyle: { color: "#1e293b" } } },
+      series: [
+        { name: "短期记忆", type: "bar", stack: "total", data: sortedCats.map((c) => stCat[c] || 0), itemStyle: { color: "#3b82f6", borderRadius: 0 }, barWidth: "50%" },
+        { name: "长期记忆", type: "bar", stack: "total", data: sortedCats.map((c) => ltCat[c] || 0), itemStyle: { color: "#10b981", borderRadius: [4, 4, 0, 0] } },
+      ],
+    };
+  }, [memStats]);
+
+  const priorityCompareOption = useMemo(() => {
+    const stPrio = memStats?.short_term?.by_priority || {};
+    const ltPrio = memStats?.long_term?.by_priority || {};
+    const prios = ["P0", "P1", "P2", "P3"];
+    return {
+      backgroundColor: "transparent",
+      tooltip: { trigger: "axis" as const },
+      legend: { data: ["短期记忆", "长期记忆"], textStyle: { color: "#94a3b8", fontSize: 11 }, top: 0 },
+      grid: { left: 50, right: 20, top: 40, bottom: 30 },
+      xAxis: { type: "category" as const, data: prios, axisLabel: { color: "#94a3b8", fontSize: 11 } },
+      yAxis: { type: "value" as const, axisLabel: { color: "#94a3b8" }, splitLine: { lineStyle: { color: "#1e293b" } } },
+      series: [
+        { name: "短期记忆", type: "bar", data: prios.map((p) => ({ value: stPrio[p] || 0, itemStyle: { color: PRIO_COLORS[p] + "aa" } })), barWidth: "30%", barGap: "10%" },
+        { name: "长期记忆", type: "bar", data: prios.map((p) => ({ value: ltPrio[p] || 0, itemStyle: { color: PRIO_COLORS[p] } })), barWidth: "30%" },
+      ],
+    };
+  }, [memStats]);
+
   return (
-    <div className="row cols-2 knowledge-split">
-      <div className="scada-table-wrap">
-        <table className="scada-table dense kb-status-table">
-          <thead>
-            <tr>
-              <th>文件名</th>
-              <th>类型</th>
-              <th>内容亮点</th>
-              <th>AgentFS</th>
-              <th>Chunks</th>
-              <th>Commit</th>
-              <th>质量</th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((item) => (
-              <tr
-                key={item.filename}
-                className={item.filename === selected?.filename ? "selected-row" : ""}
-                onClick={() => onSelect(item.filename)}
-              >
-                <td className="mono-cell">{item.filename}</td>
-                <td>{item.type}</td>
-                <td>{item.highlight}</td>
-                <td><StatusBadge tone={item.agentfs_match ? "success" : "danger"} label={item.agentfs_match ? "match" : "diff"} /></td>
-                <td className="mono-cell">{item.rag_chunks}</td>
-                <td className="mono-cell">{item.source_commit_short || "—"}</td>
-                <td><StatusBadge tone="success" label={item.quality_status} /></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+    <div>
+      <div className="scada-card" style={{ marginBottom: 14 }}>
+        <div className="risk-report-header">
+          <div className="risk-report-title">📊 记忆系统总览仪表盘</div>
+          <button className="scada-btn secondary" type="button" onClick={loadStats} disabled={loading}>🔄 刷新</button>
+        </div>
       </div>
-      <div className="knowledge-detail-drawer">
-        {selected ? (
-          <>
-            <div className="drawer-kicker">{selected.type}</div>
-            <h3>{selected.filename}</h3>
-            <p>{selected.summary}</p>
-            <div className="detail-grid">
-              <span>AgentFS</span><strong>{selected.agentfs_match ? "一致" : "存在差异"}</strong>
-              <span>RAG chunks</span><strong>{selected.rag_chunks}</strong>
-              <span>source_commit</span><strong>{selected.source_commit || selected.source_commit_short || "—"}</strong>
-              <span>文件大小</span><strong>{selected.fs_size ? `${selected.fs_size} bytes` : "—"}</strong>
-              <span>更新时间</span><strong>{selected.updated_at || "—"}</strong>
+
+      {memStats && (
+        <>
+          <div className="row cols-4" style={{ marginBottom: 14 }}>
+            <StatCard value={grandTotal} label="记忆总量" color="#f1f5f9" icon="📚" />
+            <StatCard value={shortTotal} label="短期记忆" color="#3b82f6" icon="🧠" />
+            <StatCard value={longTotal} label="长期记忆" color="#10b981" icon="💾" />
+            <StatCard value={weTotal} label="预警经验" color="#8b5cf6" icon="⚡" />
+          </div>
+
+          <div className="row cols-4" style={{ marginBottom: 14 }}>
+            <StatCard value={memStats.pending_approvals ?? 0} label="待审批" color="#f59e0b" icon="📋" />
+            <StatCard value={memStats.iteration_count ?? 0} label="迭代次数" color="#06b6d4" icon="🔄" />
+            <StatCard value={memStats.audit_log_count ?? 0} label="审计日志" color="#64748b" icon="🔍" />
+            <StatCard value={memStats.warning_experiences?.financial_total ?? 0} label="财务影响(万元)" color="#ef4444" icon="💰" />
+          </div>
+
+          <div className="scada-card" style={{ marginBottom: 14 }}>
+            <div className="risk-report-title" style={{ marginBottom: 10 }}>📈 三模块时间趋势对比（支持拖拽缩放）</div>
+            <ReactECharts option={combinedTimelineOption} style={{ height: 350 }} />
+          </div>
+
+          <div className="row cols-2" style={{ marginBottom: 14 }}>
+            <div className="scada-card">
+              <div className="risk-report-title" style={{ marginBottom: 10 }}>🎯 多维度雷达对比</div>
+              <ReactECharts option={radarOption} style={{ height: 350 }} />
             </div>
-            <div className="subtitle">关键章节</div>
-            <div className="tag-cloud">
-              {selected.key_sections.map((section) => <span key={section}>{section}</span>)}
+            <div className="scada-card">
+              <div className="risk-report-title" style={{ marginBottom: 10 }}>🌐 记忆结构旭日图</div>
+              <ReactECharts option={sunburstOption} style={{ height: 350 }} />
             </div>
-            <div className="subtitle">数据来源</div>
-            <div className="tag-cloud muted">
-              {selected.data_sources.map((source) => <span key={source}>{source}</span>)}
+          </div>
+
+          <div className="scada-card" style={{ marginBottom: 14 }}>
+            <div className="risk-report-title" style={{ marginBottom: 10 }}>⏱️ 系统状态仪表盘</div>
+            <ReactECharts option={gaugeOption} style={{ height: 250 }} />
+          </div>
+
+          <div className="row cols-2" style={{ marginBottom: 14 }}>
+            <div className="scada-card">
+              <div className="risk-report-title" style={{ marginBottom: 10 }}>📊 三模块分类对比（堆叠柱状图）</div>
+              <ReactECharts option={stackedBarOption} style={{ height: 300 }} />
             </div>
-          </>
+            <div className="scada-card">
+              <div className="risk-report-title" style={{ marginBottom: 10 }}>📈 优先级分布对比</div>
+              <ReactECharts option={priorityCompareOption} style={{ height: 300 }} />
+            </div>
+          </div>
+
+          <div className="row cols-3" style={{ marginBottom: 14 }}>
+            <div className="scada-card" style={{ padding: 16 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: "#3b82f6", marginBottom: 10 }}>🧠 短期记忆分类</div>
+              {Object.entries(memStats.short_term?.by_category || {}).sort(([, a], [, b]) => (b as number) - (a as number)).map(([k, v]) => (
+                <div key={k} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                  <span style={{ fontSize: 12, color: "#cbd5e1" }}>{CAT_LABELS[k] || k}</span>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: CAT_COLORS[k] || "#94a3b8" }}>{v as number}</span>
+                </div>
+              ))}
+            </div>
+            <div className="scada-card" style={{ padding: 16 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: "#10b981", marginBottom: 10 }}>💾 长期记忆分类</div>
+              {Object.entries(memStats.long_term?.by_category || {}).sort(([, a], [, b]) => (b as number) - (a as number)).map(([k, v]) => (
+                <div key={k} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                  <span style={{ fontSize: 12, color: "#cbd5e1" }}>{CAT_LABELS[k] || k}</span>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: CAT_COLORS[k] || "#94a3b8" }}>{v as number}</span>
+                </div>
+              ))}
+            </div>
+            <div className="scada-card" style={{ padding: 16 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: "#8b5cf6", marginBottom: 10 }}>⚡ 预警等级分布</div>
+              {Object.entries(memStats.warning_experiences?.by_level || {}).sort(([, a], [, b]) => (b as number) - (a as number)).map(([k, v]) => (
+                <div key={k} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                  <span style={{ fontSize: 12, color: "#cbd5e1" }}>{k}级预警</span>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: LEVEL_COLORS[k] || "#94a3b8" }}>{v as number}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+
+      {!memStats && !loading && (
+        <div className="scada-card"><div className="empty-state"><div className="empty-state-icon">📊</div><div>点击刷新加载统计数据</div></div></div>
+      )}
+    </div>
+  );
+}
+
+function DataManagementSection() {
+  const [loading, setLoading] = useState(false);
+  const [status, setStatus] = useState("");
+  const [stats, setStats] = useState<any>(null);
+  const [memoryStats, setMemoryStats] = useState<any>(null);
+
+  const importFromNewData = useCallback(async () => {
+    setLoading(true);
+    setStatus("正在扫描并导入 new_data 目录...");
+    try {
+      const result = await importEnterpriseData("folder");
+      if (result?.success) {
+        setStatus(`✅ 导入完成：${result.rows} 行数据`);
+        refreshStats();
+      } else {
+        setStatus(`❌ 导入失败: ${result?.message || "未知错误"}`);
+      }
+    } catch (e) {
+      setStatus(`❌ 导入失败: ${(e as Error).message}`);
+    }
+    setLoading(false);
+  }, []);
+
+  const refreshStats = useCallback(async () => {
+    const [summary, memStats] = await Promise.all([fetchEnterpriseDataSummary(), fetchMemoryStats()]);
+    setStats(summary);
+    setMemoryStats(memStats);
+  }, []);
+
+  useEffect(() => { refreshStats(); }, [refreshStats]);
+
+  return (
+    <div>
+      <div className="scada-card" style={{ marginBottom: 14 }}>
+        <div className="risk-report-header">
+          <div className="risk-report-title">📊 数据实时更新流式清洗 Pipeline</div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <span className="tag tag-emerald">数据表: {stats?.table_count ?? 0}</span>
+            <span className="tag tag-blue">企业数: {stats?.enterprise_count ?? 0}</span>
+            <span className="tag tag-violet">长期记忆: {memoryStats?.long_term.total ?? 0}</span>
+            <span className="tag tag-orange">短期记忆: {memoryStats?.short_term.total ?? 0}</span>
+            <span className="tag" style={{ background: "rgba(139,92,246,0.15)", color: "#8b5cf6" }}>预警经验: {memoryStats?.warning_experiences?.total ?? 0}</span>
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
+          <button className="scada-btn" type="button" onClick={importFromNewData} disabled={loading}>
+            {loading ? "导入中..." : "📁 从 new_data/ 导入Excel数据"}
+          </button>
+          <button className="scada-btn secondary" type="button" onClick={refreshStats}>🔄 刷新统计</button>
+        </div>
+        {status && <div className={`alert ${status.includes("✅") ? "success" : status.includes("❌") ? "error" : "info"}`} style={{ marginTop: 10 }}>{status}</div>}
+      </div>
+
+      {stats && (
+        <div className="row cols-4" style={{ marginBottom: 14 }}>
+          {[
+            { v: stats.total_entries, l: "记忆条目", c: "#10b981" },
+            { v: stats.table_count, l: "数据表", c: "#3b82f6" },
+            { v: stats.enterprise_count, l: "企业数量", c: "#f59e0b" },
+            { v: memoryStats?.warning_experiences?.total ?? 0, l: "预警经验", c: "#8b5cf6" },
+          ].map((item) => (
+            <div key={item.l} className="scada-card" style={{ textAlign: "center", padding: 16 }}>
+              <div style={{ fontSize: 28, fontWeight: 800, color: item.c, fontFamily: "JetBrains Mono" }}>{item.v}</div>
+              <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 4 }}>{item.l}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {stats?.sources?.length > 0 && (
+        <div className="scada-card">
+          <div className="risk-report-title" style={{ marginBottom: 10 }}>📁 已导入数据源</div>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            {stats.sources.map((src: string, i: number) => (
+              <span key={i} className="tag tag-cyan" style={{ fontSize: 11 }}>{src}</span>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function RiskVisualizationSection() {
+  const [loading, setLoading] = useState(false);
+  const [results, setResults] = useState<EnterpriseRiskResult[]>([]);
+  const [message, setMessage] = useState("");
+  const [selectedEnterprise, setSelectedEnterprise] = useState<string | null>(null);
+  const [riskHistory, setRiskHistory] = useState<any>(null);
+
+  const runBatchAssessment = useCallback(async () => {
+    setLoading(true);
+    setMessage("正在执行批量风险评估...");
+    try {
+      const resp = await batchRiskAssessment();
+      if (resp?.success && resp.results) {
+        setResults(resp.results);
+        setMessage(`✅ 完成 ${resp.results.length} 家企业风险评估，预警经验已自动生成`);
+      } else {
+        setMessage(`❌ 评估失败: ${resp?.message || "未知错误"}`);
+      }
+    } catch (e) {
+      setMessage(`❌ 评估失败: ${(e as Error).message}`);
+    }
+    setLoading(false);
+  }, []);
+
+  const viewEnterpriseHistory = useCallback(async (eid: string) => {
+    setSelectedEnterprise(eid);
+    const hist = await fetchEnterpriseRiskHistory(eid);
+    setRiskHistory(hist);
+  }, []);
+
+  const levelDistribution = useMemo(() => {
+    const dist: Record<string, number> = { 红: 0, 橙: 0, 黄: 0, 蓝: 0 };
+    results.forEach((r) => { dist[r.risk_level] = (dist[r.risk_level] || 0) + 1; });
+    return dist;
+  }, [results]);
+
+  const pieOption = useMemo(() => {
+    const data = Object.entries(levelDistribution).filter(([, v]) => v > 0).map(([k, v]) => ({ name: `${k}级`, value: v, itemStyle: { color: LEVEL_COLORS[k] } }));
+    return {
+      backgroundColor: "transparent",
+      tooltip: { trigger: "item" as const },
+      legend: { bottom: 0, textStyle: { color: "#94a3b8", fontSize: 11 } },
+      series: [{ type: "pie", radius: ["40%", "70%"], center: ["50%", "45%"], data, label: { color: "#e5e7eb", fontSize: 12, fontWeight: 600 } }],
+    };
+  }, [levelDistribution]);
+
+  const trendOption = useMemo(() => {
+    const categories = results.slice(0, 20).map((r) => r.enterprise_name.slice(0, 6));
+    const scores = results.slice(0, 20).map((r) => r.risk_score);
+    return {
+      backgroundColor: "transparent",
+      tooltip: { trigger: "axis" as const },
+      grid: { left: 50, right: 20, top: 30, bottom: 40 },
+      xAxis: { type: "category" as const, data: categories, axisLabel: { color: "#94a3b8", fontSize: 10, rotate: 30 } },
+      yAxis: { type: "value" as const, min: 0, max: 1, axisLabel: { color: "#94a3b8" }, splitLine: { lineStyle: { color: "#1e293b" } } },
+      series: [{
+        type: "line" as const, data: scores, smooth: true,
+        lineStyle: { color: "#3b82f6", width: 3 },
+        areaStyle: { color: { type: "linear", x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: "rgba(59,130,246,0.3)" }, { offset: 1, color: "rgba(59,130,246,0.05)" }] } },
+        itemStyle: { color: "#3b82f6" },
+        markLine: { data: [{ yAxis: 0.8, lineStyle: { color: "#ef4444", type: "dashed" }, label: { formatter: "红级阈值", color: "#ef4444" } }, { yAxis: 0.6, lineStyle: { color: "#f97316", type: "dashed" }, label: { formatter: "橙级阈值", color: "#f97316" } }] },
+      }],
+    };
+  }, [results]);
+
+  const heatmapOption = useMemo(() => {
+    const topResults = results.slice(0, 15);
+    const categories = topResults.map((r) => r.enterprise_name.slice(0, 8));
+    const indicators = ["可燃气体", "通风系统", "消防设施", "安全管理"];
+    const data: number[][] = [];
+    topResults.forEach((r, i) => { r.key_factors.forEach((kf, j) => { data.push([j, i, kf.value]); }); });
+    return {
+      backgroundColor: "transparent",
+      tooltip: { position: "top" as const },
+      grid: { left: 80, right: 30, top: 10, bottom: 60 },
+      xAxis: { type: "category" as const, data: indicators, axisLabel: { color: "#94a3b8" } },
+      yAxis: { type: "category" as const, data: categories, axisLabel: { color: "#94a3b8", fontSize: 10 } },
+      visualMap: { min: 0, max: 1, show: false, inRange: { color: ["#10b981", "#f59e0b", "#ef4444"] } },
+      series: [{ type: "heatmap" as const, data, label: { show: true, color: "#fff", fontSize: 10 }, itemStyle: { borderColor: "#0f172a", borderWidth: 1 } }],
+    };
+  }, [results]);
+
+  const historyChartOption = useMemo(() => {
+    if (!riskHistory?.history?.length) return null;
+    const times = riskHistory.history.map((h: any) => h.time.slice(5, 16));
+    const scores = riskHistory.history.map((h: any) => h.risk_score);
+    return {
+      backgroundColor: "transparent",
+      tooltip: { trigger: "axis" as const },
+      grid: { left: 50, right: 20, top: 30, bottom: 30 },
+      xAxis: { type: "category" as const, data: times, axisLabel: { color: "#94a3b8", fontSize: 10 } },
+      yAxis: { type: "value" as const, min: 0, max: 1, axisLabel: { color: "#94a3b8" }, splitLine: { lineStyle: { color: "#1e293b" } } },
+      series: [{
+        type: "line" as const, data: scores, smooth: true,
+        lineStyle: { color: "#8b5cf6", width: 3 },
+        areaStyle: { color: { type: "linear", x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: "rgba(139,92,246,0.3)" }, { offset: 1, color: "rgba(139,92,246,0.05)" }] } },
+        itemStyle: { color: "#8b5cf6" },
+      }],
+    };
+  }, [riskHistory]);
+
+  return (
+    <div>
+      <div className="scada-card" style={{ marginBottom: 14 }}>
+        <div className="risk-report-header">
+          <div className="risk-report-title">🎯 批量风险评估与预警经验生成</div>
+          <button className="scada-btn" type="button" onClick={runBatchAssessment} disabled={loading}>
+            {loading ? "评估中..." : "🚀 执行批量风险评估"}
+          </button>
+        </div>
+        {message && <div className={`alert ${message.includes("✅") ? "success" : message.includes("❌") ? "error" : "info"}`} style={{ marginTop: 10 }}>{message}</div>}
+      </div>
+
+      {results.length === 0 ? (
+        <div className="scada-card"><div className="empty-state"><div className="empty-state-icon">🎯</div><div>点击"执行批量风险评估"开始风险分析</div></div></div>
+      ) : (
+        <>
+          <div className="row cols-2" style={{ marginBottom: 14 }}>
+            <div className="scada-card">
+              <div className="risk-report-title" style={{ marginBottom: 10 }}>📊 风险等级分布</div>
+              <ReactECharts option={pieOption} style={{ height: 280 }} />
+            </div>
+            <div className="scada-card">
+              <div className="risk-report-title" style={{ marginBottom: 10 }}>📈 风险评分趋势</div>
+              <ReactECharts option={trendOption} style={{ height: 280 }} />
+            </div>
+          </div>
+
+          <div className="scada-card" style={{ marginBottom: 14 }}>
+            <div className="risk-report-title" style={{ marginBottom: 10 }}>🔥 企业风险热力图</div>
+            <ReactECharts option={heatmapOption} style={{ height: 400 }} />
+          </div>
+
+          {selectedEnterprise && historyChartOption && (
+            <div className="scada-card" style={{ marginBottom: 14 }}>
+              <div className="risk-report-title" style={{ marginBottom: 10 }}>📈 企业风险历史 - {selectedEnterprise}</div>
+              <ReactECharts option={historyChartOption} style={{ height: 250 }} />
+            </div>
+          )}
+
+          <div className="scada-card">
+            <div className="risk-report-title" style={{ marginBottom: 10 }}>📋 详细评估结果</div>
+            <table className="scada-table">
+              <thead>
+                <tr><th>企业ID</th><th>企业名称</th><th>场景</th><th>风险评分</th><th>风险等级</th><th>评估时间</th><th>预警经验</th><th>历史</th></tr>
+              </thead>
+              <tbody>
+                {results.map((r) => (
+                  <tr key={r.enterprise_id} className={r.risk_level === "红" ? "risk-score-table-row-red" : r.risk_level === "橙" ? "risk-score-table-row-orange" : r.risk_level === "黄" ? "risk-score-table-row-yellow" : ""}>
+                    <td className="font-mono" style={{ fontSize: 11 }}>{r.enterprise_id}</td>
+                    <td style={{ fontWeight: 600 }}>{r.enterprise_name}</td>
+                    <td><span className="tag tag-cyan" style={{ fontSize: 10 }}>{r.scenario}</span></td>
+                    <td className="font-mono" style={{ fontWeight: 700, color: LEVEL_COLORS[r.risk_level] }}>{r.risk_score.toFixed(4)}</td>
+                    <td><span className="tag" style={{ background: LEVEL_BG[r.risk_level], color: LEVEL_COLORS[r.risk_level], fontWeight: 700 }}>{r.risk_level}级</span></td>
+                    <td style={{ fontSize: 11, color: "#94a3b8" }}>{r.assessment_time}</td>
+                    <td>{r.inference_stored ? <span style={{ color: "#10b981" }}>✅ 已生成</span> : <span style={{ color: "#64748b" }}>—</span>}</td>
+                    <td><button className="scada-btn secondary" style={{ fontSize: 10, padding: "2px 8px" }} type="button" onClick={() => viewEnterpriseHistory(r.enterprise_id)}>📈</button></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function ExcelImportSection() {
+  const [loading, setLoading] = useState(false);
+  const [status, setStatus] = useState("");
+  const [results, setResults] = useState<EnterpriseRiskResult[]>([]);
+  const predictFileRef = useRef<HTMLInputElement>(null);
+  const memoryFileRef = useRef<HTMLInputElement>(null);
+
+  const handleFileUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setLoading(true);
+    setStatus(`正在导入 ${file.name} 并执行预测分析...`);
+    try {
+      const result = await assessEnterpriseFile(file);
+      if (result?.success && result.results) {
+        setResults(result.results);
+        setStatus(`✅ 完成 ${result.total_rows} 条数据预测分析，预警经验已自动生成`);
+      } else {
+        setStatus(`❌ 预测分析失败: ${result?.message || "未知错误"}`);
+      }
+    } catch (err) {
+      setStatus(`❌ 预测分析失败: ${(err as Error).message}`);
+    }
+    setLoading(false);
+    if (predictFileRef.current) predictFileRef.current.value = "";
+  }, []);
+
+  const handleImportToMemory = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setLoading(true);
+    setStatus(`正在将 ${file.name} 导入长期记忆库...`);
+    try {
+      const result = await importExcelFile(file);
+      if (result?.success) {
+        setStatus(`✅ ${file.name} 导入成功：${result.rows}行 × ${result.columns}列`);
+      } else {
+        setStatus(`❌ 导入失败: ${result?.message || "未知错误"}`);
+      }
+    } catch (err) {
+      setStatus(`❌ 导入失败: ${(err as Error).message}`);
+    }
+    setLoading(false);
+    if (memoryFileRef.current) memoryFileRef.current.value = "";
+  }, []);
+
+  const handleExport = useCallback(async (memoryType: string, format: string) => {
+    const blob = await exportMemoryData({ memory_type: memoryType, format });
+    if (!blob) { setStatus("❌ 导出失败"); return; }
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${memoryType}_export.${format}`;
+    a.click();
+    URL.revokeObjectURL(url);
+    setStatus(`✅ 导出成功`);
+  }, []);
+
+  const levelDistribution = useMemo(() => {
+    const dist: Record<string, number> = { 红: 0, 橙: 0, 黄: 0, 蓝: 0 };
+    results.forEach((r) => { dist[r.risk_level] = (dist[r.risk_level] || 0) + 1; });
+    return dist;
+  }, [results]);
+
+  const pieOption = useMemo(() => {
+    const data = Object.entries(levelDistribution).filter(([, v]) => v > 0).map(([k, v]) => ({ name: `${k}级`, value: v, itemStyle: { color: LEVEL_COLORS[k] } }));
+    return {
+      backgroundColor: "transparent",
+      tooltip: { trigger: "item" as const },
+      series: [{ type: "pie", radius: ["30%", "60%"], data, label: { color: "#94a3b8", fontSize: 11 } }],
+    };
+  }, [levelDistribution]);
+
+  return (
+    <div>
+      <div className="scada-card" style={{ marginBottom: 14 }}>
+        <div className="risk-report-header">
+          <div className="risk-report-title">📥 Excel文件导入与预测分析</div>
+        </div>
+        <div style={{ display: "flex", gap: 12, marginTop: 12, flexWrap: "wrap" }}>
+          <label className="scada-btn" style={{ cursor: "pointer" }}>
+            🔍 选择文件进行预测分析
+            <input ref={predictFileRef} type="file" accept=".xlsx,.xls,.csv" style={{ display: "none" }} onChange={handleFileUpload} disabled={loading} />
+          </label>
+          <label className="scada-btn secondary" style={{ cursor: "pointer" }}>
+            💾 导入到长期记忆库
+            <input ref={memoryFileRef} type="file" accept=".xlsx,.xls,.csv" style={{ display: "none" }} onChange={handleImportToMemory} disabled={loading} />
+          </label>
+          <button className="scada-btn secondary" type="button" onClick={() => handleExport("long", "xlsx")}>📤 导出长期记忆</button>
+          <button className="scada-btn secondary" type="button" onClick={() => handleExport("short", "csv")}>📤 导出短期记忆</button>
+        </div>
+        {status && <div className={`alert ${status.includes("✅") ? "success" : status.includes("❌") ? "error" : "info"}`} style={{ marginTop: 10 }}>{status}</div>}
+      </div>
+
+      {results.length > 0 && (
+        <>
+          <div className="row cols-2" style={{ marginBottom: 14 }}>
+            <div className="scada-card">
+              <div className="risk-report-title" style={{ marginBottom: 10 }}>📊 风险等级分布</div>
+              <ReactECharts option={pieOption} style={{ height: 250 }} />
+            </div>
+            <div className="scada-card">
+              <div className="risk-report-title" style={{ marginBottom: 10 }}>📋 预测结果摘要</div>
+              <div style={{ fontSize: 13, lineHeight: 2 }}>
+                <div>总企业数: <b style={{ color: "#f1f5f9" }}>{results.length}</b></div>
+                <div style={{ color: "#ef4444" }}>红色预警: <b>{levelDistribution["红"]}</b> 家</div>
+                <div style={{ color: "#f97316" }}>橙色预警: <b>{levelDistribution["橙"]}</b> 家</div>
+                <div style={{ color: "#eab308" }}>黄色预警: <b>{levelDistribution["黄"]}</b> 家</div>
+                <div style={{ color: "#3b82f6" }}>蓝色预警: <b>{levelDistribution["蓝"]}</b> 家</div>
+              </div>
+            </div>
+          </div>
+          <div className="scada-card">
+            <div className="risk-report-title" style={{ marginBottom: 10 }}>📋 详细预测结果</div>
+            <table className="scada-table">
+              <thead><tr><th>企业名称</th><th>风险评分</th><th>风险等级</th><th>场景</th><th>关键指标</th></tr></thead>
+              <tbody>
+                {results.map((r, i) => (
+                  <tr key={i} className={r.risk_level === "红" ? "risk-score-table-row-red" : r.risk_level === "橙" ? "risk-score-table-row-orange" : ""}>
+                    <td style={{ fontWeight: 600 }}>{r.enterprise_name}</td>
+                    <td className="font-mono" style={{ fontWeight: 700, color: LEVEL_COLORS[r.risk_level] }}>{r.risk_score.toFixed(4)}</td>
+                    <td><span className="tag" style={{ background: LEVEL_BG[r.risk_level], color: LEVEL_COLORS[r.risk_level], fontWeight: 700 }}>{r.risk_level}级</span></td>
+                    <td><span className="tag tag-cyan" style={{ fontSize: 10 }}>{r.scenario}</span></td>
+                    <td>{r.key_factors.map((f) => <span key={f.name} className="tag" style={{ fontSize: 10, background: "rgba(100,116,139,0.15)", color: "#cbd5e1", margin: 1 }}>{f.name}:{f.value.toFixed(2)}</span>)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function WarningExperienceSection() {
+  const [experiences, setExperiences] = useState<any[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [search, setSearch] = useState("");
+  const [filterLevel, setFilterLevel] = useState("");
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [page, setPage] = useState(0);
+  const [memStats, setMemStats] = useState<any>(null);
+  const [showExport, setShowExport] = useState(false);
+  const pageSize = 20;
+
+  const loadExperiences = useCallback(async () => {
+    setLoading(true);
+    const [resp, stats] = await Promise.all([
+      fetchWarningExperiences({ search: search || undefined, risk_level: filterLevel || undefined, limit: pageSize, offset: page * pageSize }),
+      fetchMemoryStats(),
+    ]);
+    if (resp) { setExperiences(resp.items || []); setTotal(resp.total); }
+    if (stats) setMemStats(stats);
+    setLoading(false);
+  }, [search, filterLevel, page]);
+
+  useEffect(() => { loadExperiences(); }, [loadExperiences]);
+
+  const levelDist = useMemo(() => {
+    const d: Record<string, number> = { 红: 0, 橙: 0, 黄: 0, 蓝: 0 };
+    experiences.forEach((e) => { d[e.risk_level] = (d[e.risk_level] || 0) + 1; });
+    return d;
+  }, [experiences]);
+
+  const pieOption = useMemo(() => {
+    const data = Object.entries(levelDist).filter(([, v]) => v > 0).map(([k, v]) => ({ name: `${k}级`, value: v, itemStyle: { color: LEVEL_COLORS[k] } }));
+    if (!data.length) data.push({ name: "暂无", value: 1, itemStyle: { color: "#334155" } });
+    return { backgroundColor: "transparent", tooltip: { trigger: "item" as const, formatter: "{b}: {c} ({d}%)" }, legend: { bottom: 0, textStyle: { color: "#94a3b8", fontSize: 10 } }, series: [{ type: "pie", radius: ["35%", "65%"], center: ["50%", "45%"], data, label: { color: "#94a3b8", fontSize: 11, formatter: "{b}\n{c}条" }, emphasis: { itemStyle: { shadowBlur: 10, shadowOffsetX: 0, shadowColor: "rgba(0,0,0,0.5)" } } }] };
+  }, [levelDist]);
+
+  const weStatsTimelineOption = useMemo(() => {
+    const tl = memStats?.warning_experiences?.timeline || {};
+    const entries = Object.entries(tl).sort(([a], [b]) => a.localeCompare(b));
+    if (!entries.length) return { backgroundColor: "transparent" };
+    return { backgroundColor: "transparent", tooltip: { trigger: "axis" as const }, grid: { left: 50, right: 20, top: 20, bottom: 50 }, xAxis: { type: "category" as const, data: entries.map(([d]) => d.slice(5)), axisLabel: { color: "#94a3b8", fontSize: 10 } }, yAxis: { type: "value" as const, axisLabel: { color: "#94a3b8" }, splitLine: { lineStyle: { color: "#1e293b" } } }, dataZoom: [{ type: "inside", start: 0, end: 100 }, { type: "slider", start: 0, end: 100, height: 20, bottom: 5, borderColor: "#334155", backgroundColor: "#0f172a", dataBackground: { lineStyle: { color: "#334155" }, areaStyle: { color: "#1e293b" } }, selectedDataBackground: { lineStyle: { color: "#8b5cf6" }, areaStyle: { color: "rgba(139,92,246,0.2)" } }, textStyle: { color: "#94a3b8" } }], series: [{ type: "line" as const, data: entries.map(([, v]) => v), smooth: true, lineStyle: { color: "#8b5cf6", width: 3 }, areaStyle: { color: { type: "linear", x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: "rgba(139,92,246,0.3)" }, { offset: 1, color: "rgba(139,92,246,0.05)" }] } }, itemStyle: { color: "#8b5cf6" } }] };
+  }, [memStats]);
+
+  const scenarioBarOption = useMemo(() => {
+    const bySc = memStats?.warning_experiences?.by_scenario || {};
+    const top = Object.entries(bySc).sort(([, a], [, b]) => (b as number) - (a as number));
+    if (!top.length) return { backgroundColor: "transparent" };
+    const scenarioLabels: Record<string, string> = { chemical: "化工", metallurgy: "冶金", dust: "粉尘", mining: "矿山" };
+    return { backgroundColor: "transparent", tooltip: { trigger: "axis" as const }, grid: { left: 60, right: 20, top: 20, bottom: 30 }, xAxis: { type: "category" as const, data: top.map(([k]) => scenarioLabels[k] || k), axisLabel: { color: "#94a3b8" } }, yAxis: { type: "value" as const, axisLabel: { color: "#94a3b8" }, splitLine: { lineStyle: { color: "#1e293b" } } }, series: [{ type: "bar" as const, data: top.map(([, v]) => ({ value: v as number, itemStyle: { color: { type: "linear", x: 0, y: 1, x2: 0, y2: 0, colorStops: [{ offset: 0, color: "#8b5cf6" + "88" }, { offset: 1, color: "#8b5cf6" }] }, borderRadius: [6, 6, 0, 0] } })), barWidth: "40%" }] };
+  }, [memStats]);
+
+  const financialGaugeOption = useMemo(() => {
+    const ft = memStats?.warning_experiences?.financial_total ?? 0;
+    const maxVal = Math.max(ft * 1.5, 100);
+    return {
+      backgroundColor: "transparent",
+      series: [{
+        type: "gauge", center: ["50%", "55%"], radius: "80%",
+        min: 0, max: maxVal, splitNumber: 5,
+        axisLine: { lineStyle: { width: 10, color: [[0.3, "#10b981"], [0.6, "#f59e0b"], [1, "#ef4444"]] } },
+        pointer: { length: "60%", width: 5, itemStyle: { color: "#94a3b8" } },
+        axisTick: { distance: -8, length: 6, lineStyle: { color: "#475569", width: 1 } },
+        splitLine: { distance: -10, length: 12, lineStyle: { color: "#64748b", width: 2 } },
+        axisLabel: { color: "#94a3b8", fontSize: 9, distance: 16 },
+        detail: { formatter: "{value}万元", color: "#f1f5f9", fontSize: 16, fontWeight: 800, offsetCenter: [0, "60%"] },
+        title: { offsetCenter: [0, "80%"], color: "#94a3b8", fontSize: 10 },
+        data: [{ value: ft, name: "财务影响" }],
+      }],
+    };
+  }, [memStats]);
+
+  const weLevelScenarioHeatmapOption = useMemo(() => {
+    const byLevel = memStats?.warning_experiences?.by_level || {};
+    const bySc = memStats?.warning_experiences?.by_scenario || {};
+    const levels = Object.keys(byLevel);
+    const scenarios = Object.keys(bySc);
+    if (!levels.length || !scenarios.length) return { backgroundColor: "transparent" };
+    const data: number[][] = [];
+    const levelOrder = ["红", "橙", "黄", "蓝"].filter((l) => levels.includes(l));
+    const scOrder = scenarios.slice(0, 6);
+    const scenarioLabels: Record<string, string> = { chemical: "化工", metallurgy: "冶金", dust: "粉尘", mining: "矿山" };
+    levelOrder.forEach((lv, li) => {
+      scOrder.forEach((sc, si) => {
+        const count = experiences.filter((e) => e.risk_level === lv && e.scenario === sc).length;
+        data.push([si, li, count]);
+      });
+    });
+    if (!data.some((d) => d[2] > 0)) return { backgroundColor: "transparent" };
+    return {
+      backgroundColor: "transparent",
+      tooltip: { formatter: (p: any) => `${scenarioLabels[scOrder[p.data[0]]] || scOrder[p.data[0]]} × ${levelOrder[p.data[1]]}级: ${p.data[2]}条` },
+      grid: { left: 60, right: 40, top: 10, bottom: 40 },
+      xAxis: { type: "category" as const, data: scOrder.map((s) => scenarioLabels[s] || s), axisLabel: { color: "#94a3b8", fontSize: 10 } },
+      yAxis: { type: "category" as const, data: levelOrder.map((l) => `${l}级`), axisLabel: { color: "#94a3b8", fontSize: 11 } },
+      visualMap: { min: 0, max: Math.max(...data.map((d) => d[2]), 1), show: true, orient: "vertical" as const, right: 0, top: "center", textStyle: { color: "#94a3b8", fontSize: 10 }, inRange: { color: ["#1e293b", "#8b5cf6", "#a78bfa", "#c4b5fd"] } },
+      series: [{ type: "heatmap" as const, data, label: { show: true, color: "#fff", fontSize: 11, formatter: (p: any) => p.data[2] || "" }, itemStyle: { borderColor: "#0f172a", borderWidth: 2 } }],
+    };
+  }, [memStats, experiences]);
+
+  const financialTotal = memStats?.warning_experiences?.financial_total ?? 0;
+
+  return (
+    <div>
+      <div className="scada-card" style={{ marginBottom: 14 }}>
+        <div className="risk-report-header">
+          <div className="risk-report-title">⚡ 预警经验库</div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <span className="tag tag-violet">总计: {total} 条</span>
+            <button className="scada-btn secondary" style={{ fontSize: 11, padding: "2px 8px" }} type="button" onClick={() => setShowExport(!showExport)}>📤 导出</button>
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap", alignItems: "center" }}>
+          <input className="scada-input" placeholder="搜索预警经验..." value={search} onChange={(e) => { setSearch(e.target.value); setPage(0); }} style={{ width: 200 }} />
+          <select className="scada-input" value={filterLevel} onChange={(e) => { setFilterLevel(e.target.value); setPage(0); }} style={{ width: 120 }}>
+            <option value="">全部等级</option><option value="红">红色</option><option value="橙">橙色</option><option value="黄">黄色</option><option value="蓝">蓝色</option>
+          </select>
+          <button className="scada-btn secondary" type="button" onClick={loadExperiences}>🔍 搜索</button>
+        </div>
+      </div>
+
+      {showExport && <ExportDialog memoryType="warning_experience" onClose={() => setShowExport(false)} />}
+
+      {memStats && (
+        <>
+          <div className="row cols-4" style={{ marginBottom: 14 }}>
+            <StatCard value={memStats.warning_experiences?.total ?? 0} label="预警经验总数" color="#8b5cf6" icon="⚡" />
+            <StatCard value={memStats.warning_experiences?.by_level?.["红"] ?? 0} label="红色预警" color="#ef4444" icon="🔴" />
+            <StatCard value={Object.keys(memStats.warning_experiences?.by_scenario || {}).length} label="场景类型" color="#f59e0b" icon="🎯" />
+            <StatCard value={financialTotal} label="财务影响(万元)" color="#10b981" icon="💰" />
+          </div>
+          <div className="row cols-2" style={{ marginBottom: 14 }}>
+            <div className="scada-card"><div className="risk-report-title" style={{ marginBottom: 10 }}>📊 风险等级分布</div><ReactECharts option={pieOption} style={{ height: 280 }} /></div>
+            <div className="scada-card"><div className="risk-report-title" style={{ marginBottom: 10 }}>📈 预警生成趋势</div><ReactECharts option={weStatsTimelineOption} style={{ height: 280 }} /></div>
+          </div>
+          <div className="row cols-2" style={{ marginBottom: 14 }}>
+            <div className="scada-card"><div className="risk-report-title" style={{ marginBottom: 10 }}>💰 财务影响仪表盘</div><ReactECharts option={financialGaugeOption} style={{ height: 220 }} /></div>
+            <div className="scada-card"><div className="risk-report-title" style={{ marginBottom: 10 }}>🎯 场景分布</div><ReactECharts option={scenarioBarOption} style={{ height: 220 }} /></div>
+          </div>
+          <div className="scada-card" style={{ marginBottom: 14 }}>
+            <div className="risk-report-title" style={{ marginBottom: 10 }}>🔥 等级×场景关联热力图</div>
+            <ReactECharts option={weLevelScenarioHeatmapOption} style={{ height: 250 }} />
+          </div>
+        </>
+      )}
+
+      <div className="scada-card">
+        {experiences.length === 0 ? (
+          <div className="empty-state"><div className="empty-state-icon">⚡</div><div>暂无预警经验，执行风险评估后自动生成</div></div>
         ) : (
-          <div className="empty-state">请选择一个知识库</div>
+          experiences.map((exp) => (
+            <div key={exp.id} style={{ border: "1px solid #1e293b", borderRadius: 8, marginBottom: 8, overflow: "hidden" }}>
+              <div
+                style={{ padding: "10px 14px", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center", background: LEVEL_BG[exp.risk_level] || "rgba(100,116,139,0.08)" }}
+                onClick={() => setExpandedId(expandedId === exp.id ? null : exp.id)}
+              >
+                <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                  <span className="tag" style={{ background: LEVEL_BG[exp.risk_level], color: LEVEL_COLORS[exp.risk_level], fontWeight: 700 }}>{exp.risk_level}级</span>
+                  <span style={{ fontWeight: 600, color: "#f1f5f9" }}>{exp.enterprise_name}</span>
+                  <span style={{ fontSize: 11, color: "#94a3b8" }}>评分: {exp.risk_score?.toFixed(4)}</span>
+                  <span style={{ fontSize: 11, color: "#94a3b8" }}>{exp.generated_at}</span>
+                </div>
+                <span style={{ color: "#64748b", fontSize: 12 }}>{expandedId === exp.id ? "▼" : "▶"}</span>
+              </div>
+              {expandedId === exp.id && (
+                <div style={{ padding: 14, background: "rgba(15,23,42,0.5)" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+                    <div><div style={{ fontSize: 11, color: "#64748b", marginBottom: 4 }}>根本原因</div><div style={{ fontSize: 13, color: "#e5e7eb" }}>{exp.root_cause}</div></div>
+                    <div><div style={{ fontSize: 11, color: "#64748b", marginBottom: 4 }}>运营影响</div><div style={{ fontSize: 13, color: "#e5e7eb" }}>{exp.operational_impact}</div></div>
+                    <div><div style={{ fontSize: 11, color: "#64748b", marginBottom: 4 }}>财务影响</div><div style={{ fontSize: 13, color: "#e5e7eb" }}>{exp.financial_impact} 万元</div></div>
+                    <div><div style={{ fontSize: 11, color: "#64748b", marginBottom: 4 }}>行业基准</div><div style={{ fontSize: 13, color: "#e5e7eb" }}>{exp.industry_benchmark}</div></div>
+                  </div>
+                  <div style={{ marginBottom: 12 }}>
+                    <div style={{ fontSize: 11, color: "#64748b", marginBottom: 4 }}>处置措施</div>
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                      {exp.actions_taken?.map((a: string, i: number) => (<span key={i} className="tag tag-cyan" style={{ fontSize: 11 }}>{a}</span>))}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 11, color: "#64748b", marginBottom: 4 }}>关键风险因素</div>
+                    <table className="scada-table" style={{ fontSize: 12 }}>
+                      <thead><tr><th>指标</th><th>数值</th><th>风险贡献</th></tr></thead>
+                      <tbody>
+                        {exp.key_factors_summary?.map((f: any, i: number) => (
+                          <tr key={i}><td>{f.name}</td><td className="font-mono">{f.value?.toFixed(3)}</td><td><span className="tag" style={{ background: f.risk_contribution === "高" ? "rgba(239,68,68,0.15)" : f.risk_contribution === "中" ? "rgba(249,115,22,0.15)" : "rgba(59,130,246,0.15)", color: f.risk_contribution === "高" ? "#ef4444" : f.risk_contribution === "中" ? "#f97316" : "#3b82f6" }}>{f.risk_contribution}</span></td></tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))
+        )}
+        {total > pageSize && (
+          <div style={{ display: "flex", justifyContent: "center", gap: 8, marginTop: 12 }}>
+            <button className="scada-btn secondary" type="button" disabled={page === 0} onClick={() => setPage(page - 1)}>上一页</button>
+            <span style={{ color: "#94a3b8", lineHeight: "32px" }}>第 {page + 1} 页 / 共 {Math.ceil(total / pageSize)} 页</span>
+            <button className="scada-btn secondary" type="button" disabled={(page + 1) * pageSize >= total} onClick={() => setPage(page + 1)}>下一页</button>
+          </div>
         )}
       </div>
     </div>
   );
 }
 
-function AgentFSPanel({ system }: { system: KnowledgeSystemOverview }) {
-  const agentfs = system.agentfs;
+function MemoryDetailModal({ item, onClose }: { item: any; onClose: () => void }) {
+  if (!item) return null;
   return (
-    <div>
-      <div className="row cols-4">
-        <ScadaCard title="Snapshot commit" value={<span className="compact-card-value">{agentfs.snapshot_commit_short || "—"}</span>} sub={agentfs.snapshot_commit_id} glowClass="glow-blue" />
-        <ScadaCard title="FS / AgentFS" value={<span className="compact-card-value">{agentfs.fs_agentfs_match ? "match" : "diff"}</span>} sub="六库逐字节校验" glowClass={agentfs.fs_agentfs_match ? "glow-green" : "glow-orange"} />
-        <ScadaCard title="Sync script" value={<span className="compact-card-value">{agentfs.sync_script_name}</span>} sub={agentfs.agent_id} glowClass="glow-white" />
-        <ScadaCard title="Deprecated path" value={agentfs.deprecated_entries.length} sub="保留 warning" glowClass="glow-orange" />
-      </div>
-
-      <div className="row cols-2" style={{ marginTop: 12 }}>
-        <div className="advice-card">
-          <div className="advice-card-title">同步快照</div>
-          <div className="detail-grid">
-            <span>db_path</span><strong>{agentfs.db_path || "—"}</strong>
-            <span>backup_path</span><strong>{agentfs.backup_path || "—"}</strong>
-            <span>说明</span><strong>当前页面不提供写入或重新同步能力。</strong>
-          </div>
-          <button className="scada-btn secondary" type="button" disabled style={{ marginTop: 12 }}>
-            重新同步不可用
-          </button>
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={onClose}>
+      <div style={{ background: "#0f172a", border: "1px solid #334155", borderRadius: 12, padding: 24, maxWidth: 700, width: "90%", maxHeight: "80vh", overflow: "auto" }} onClick={(e) => e.stopPropagation()}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+          <div style={{ fontSize: 16, fontWeight: 700, color: "#f1f5f9" }}>📋 记忆详情</div>
+          <button className="scada-btn secondary" style={{ fontSize: 11, padding: "4px 10px" }} type="button" onClick={onClose}>✕ 关闭</button>
         </div>
-        <div className="alert warning">
-          {agentfs.deprecated_warning}
-          <div className="mini-list">
-            {agentfs.deprecated_entries.map((entry, index) => (
-              <span key={index}>{String(entry.path ?? "deprecated_malformed_path")}</span>
-            ))}
-          </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 16 }}>
+          <div><span style={{ color: "#64748b", fontSize: 11 }}>ID: </span><span className="font-mono" style={{ color: "#94a3b8", fontSize: 11 }}>{item.id}</span></div>
+          <div><span style={{ color: "#64748b", fontSize: 11 }}>优先级: </span><span className="tag" style={{ background: PRIO_BG[item.priority] || PRIO_BG.P2, color: PRIO_COLORS[item.priority] || PRIO_COLORS.P2, fontWeight: 700, fontSize: 10 }}>{item.priority}</span></div>
+          <div><span style={{ color: "#64748b", fontSize: 11 }}>分类: </span><span className="tag tag-cyan" style={{ fontSize: 10 }}>{CAT_LABELS[item.category] || item.category}</span></div>
+          <div><span style={{ color: "#64748b", fontSize: 11 }}>类型: </span><span style={{ color: "#cbd5e1", fontSize: 12 }}>{item.type === "short" ? "短期记忆" : "长期记忆"}</span></div>
+          <div><span style={{ color: "#64748b", fontSize: 11 }}>企业ID: </span><span className="font-mono" style={{ color: "#94a3b8", fontSize: 11 }}>{item.enterprise_id || "—"}</span></div>
+          <div><span style={{ color: "#64748b", fontSize: 11 }}>时间: </span><span style={{ color: "#94a3b8", fontSize: 11 }}>{item.time}</span></div>
+          {item.data_source && <div><span style={{ color: "#64748b", fontSize: 11 }}>数据源: </span><span style={{ color: "#94a3b8", fontSize: 11 }}>{item.data_source}</span></div>}
+          {item.verified !== undefined && <div><span style={{ color: "#64748b", fontSize: 11 }}>已验证: </span><span style={{ color: item.verified ? "#10b981" : "#ef4444", fontSize: 11 }}>{item.verified ? "✅ 是" : "❌ 否"}</span></div>}
         </div>
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ color: "#64748b", fontSize: 11, marginBottom: 6 }}>完整内容:</div>
+          <div style={{ background: "rgba(30,41,59,0.5)", borderRadius: 8, padding: 12, color: "#e5e7eb", fontSize: 13, lineHeight: 1.7, maxHeight: 200, overflow: "auto", whiteSpace: "pre-wrap", wordBreak: "break-all" }}>{item.text}</div>
+        </div>
+        {item.tags?.length > 0 && (
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ color: "#64748b", fontSize: 11, marginBottom: 6 }}>标签:</div>
+            <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+              {item.tags.map((t: string, i: number) => <span key={i} className="tag" style={{ fontSize: 10, background: "rgba(100,116,139,0.15)", color: "#cbd5e1" }}>{t}</span>)}
+            </div>
+          </div>
+        )}
+        {item.row_data && (
+          <div>
+            <div style={{ color: "#64748b", fontSize: 11, marginBottom: 6 }}>行数据:</div>
+            <div style={{ background: "rgba(30,41,59,0.5)", borderRadius: 8, padding: 12, maxHeight: 200, overflow: "auto" }}>
+              {Object.entries(item.row_data).map(([k, v]) => (
+                <div key={k} style={{ display: "flex", gap: 8, marginBottom: 4, fontSize: 12 }}>
+                  <span style={{ color: "#64748b", minWidth: 100 }}>{k}:</span>
+                  <span style={{ color: "#e5e7eb" }}>{String(v)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
-function RagPanel({
-  query,
-  onQueryChange,
-  onSearch,
-  results,
-  loading,
-  mode,
-  system,
-}: {
-  query: string;
-  onQueryChange: (value: string) => void;
-  onSearch: (value?: string) => void;
-  results: KnowledgeRagResult[];
-  loading: boolean;
-  mode: string;
-  system: KnowledgeSystemOverview;
-}) {
+function ShortTermMemorySection() {
+  const [items, setItems] = useState<any[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [search, setSearch] = useState("");
+  const [filterCat, setFilterCat] = useState("");
+  const [page, setPage] = useState(0);
+  const [memStats, setMemStats] = useState<any>(null);
+  const [showExport, setShowExport] = useState(false);
+  const [detailItem, setDetailItem] = useState<any>(null);
+  const pageSize = 20;
+
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    const [resp, stats] = await Promise.all([
+      queryShortTermMemoryPaginated({ search: search || undefined, category: filterCat || undefined, limit: pageSize, offset: page * pageSize }),
+      fetchMemoryStats(),
+    ]);
+    if (resp) { setItems(resp.items || []); setTotal(resp.total); }
+    if (stats) setMemStats(stats);
+    setLoading(false);
+  }, [search, filterCat, page]);
+
+  useEffect(() => { loadData(); }, [loadData]);
+
+  const handleMigrate = useCallback(async (ids: string[]) => { await migrateToLongTerm(ids); loadData(); }, [loadData]);
+  const handleDelete = useCallback(async (id: string) => { await deleteShortTermMemory(id); loadData(); }, [loadData]);
+
+  const catPieOption = useMemo(() => {
+    const byCat = memStats?.short_term?.by_category || {};
+    const data = Object.entries(byCat).filter(([, v]) => (v as number) > 0).map(([k, v]) => ({ name: CAT_LABELS[k] || k, value: v as number, itemStyle: { color: CAT_COLORS[k] || "#64748b" } }));
+    if (!data.length) data.push({ name: "暂无数据", value: 1, itemStyle: { color: "#334155" } });
+    return { backgroundColor: "transparent", tooltip: { trigger: "item" as const, formatter: "{b}: {c} ({d}%)" }, legend: { bottom: 0, textStyle: { color: "#94a3b8", fontSize: 10 } }, series: [{ type: "pie", radius: ["35%", "65%"], center: ["50%", "45%"], data, label: { color: "#94a3b8", fontSize: 10, formatter: "{b}\n{c}条" }, emphasis: { itemStyle: { shadowBlur: 10, shadowOffsetX: 0, shadowColor: "rgba(0,0,0,0.5)" } } }] };
+  }, [memStats]);
+
+  const prioBarOption = useMemo(() => {
+    const byPrio = memStats?.short_term?.by_priority || {};
+    const prios = ["P0", "P1", "P2", "P3"];
+    return { backgroundColor: "transparent", tooltip: { trigger: "axis" as const }, grid: { left: 50, right: 20, top: 20, bottom: 30 }, xAxis: { type: "category" as const, data: prios, axisLabel: { color: "#94a3b8" } }, yAxis: { type: "value" as const, axisLabel: { color: "#94a3b8" }, splitLine: { lineStyle: { color: "#1e293b" } } }, series: [{ type: "bar" as const, data: prios.map((p) => ({ value: byPrio[p] || 0, itemStyle: { color: { type: "linear", x: 0, y: 1, x2: 0, y2: 0, colorStops: [{ offset: 0, color: PRIO_COLORS[p] + "88" }, { offset: 1, color: PRIO_COLORS[p] }] }, borderRadius: [6, 6, 0, 0] } })), barWidth: "40%" }] };
+  }, [memStats]);
+
+  const timelineOption = useMemo(() => {
+    const tl = memStats?.short_term?.timeline || {};
+    const entries = Object.entries(tl).sort(([a], [b]) => a.localeCompare(b));
+    if (!entries.length) return { backgroundColor: "transparent" };
+    return { backgroundColor: "transparent", tooltip: { trigger: "axis" as const }, grid: { left: 50, right: 20, top: 20, bottom: 50 }, xAxis: { type: "category" as const, data: entries.map(([d]) => d.slice(5)), axisLabel: { color: "#94a3b8", fontSize: 10 } }, yAxis: { type: "value" as const, axisLabel: { color: "#94a3b8" }, splitLine: { lineStyle: { color: "#1e293b" } } }, dataZoom: [{ type: "inside", start: 0, end: 100 }, { type: "slider", start: 0, end: 100, height: 20, bottom: 5, borderColor: "#334155", backgroundColor: "#0f172a", dataBackground: { lineStyle: { color: "#334155" }, areaStyle: { color: "#1e293b" } }, selectedDataBackground: { lineStyle: { color: "#3b82f6" }, areaStyle: { color: "rgba(59,130,246,0.2)" } }, textStyle: { color: "#94a3b8" } }], series: [{ type: "line" as const, data: entries.map(([, v]) => v), smooth: true, lineStyle: { color: "#3b82f6", width: 3 }, areaStyle: { color: { type: "linear", x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: "rgba(59,130,246,0.3)" }, { offset: 1, color: "rgba(59,130,246,0.05)" }] } }, itemStyle: { color: "#3b82f6" } }] };
+  }, [memStats]);
+
+  const enterpriseBarOption = useMemo(() => {
+    const byEnt = memStats?.short_term?.by_enterprise || {};
+    const top = Object.entries(byEnt).sort(([, a], [, b]) => (b as number) - (a as number)).slice(0, 8);
+    if (!top.length) return { backgroundColor: "transparent" };
+    return { backgroundColor: "transparent", tooltip: { trigger: "axis" as const }, grid: { left: 80, right: 20, top: 20, bottom: 30 }, xAxis: { type: "value" as const, axisLabel: { color: "#94a3b8" }, splitLine: { lineStyle: { color: "#1e293b" } } }, yAxis: { type: "category" as const, data: top.map(([k]) => k.slice(0, 10)), axisLabel: { color: "#94a3b8", fontSize: 10 } }, series: [{ type: "bar" as const, data: top.map(([, v]) => ({ value: v as number, itemStyle: { color: { type: "linear", x: 0, y: 0, x2: 1, y2: 0, colorStops: [{ offset: 0, color: "#06b6d4" }, { offset: 1, color: "#22d3ee" }] }, borderRadius: [0, 6, 6, 0] } })), barWidth: "50%" }] };
+  }, [memStats]);
+
+  const heatmapOption = useMemo(() => {
+    const byCat = memStats?.short_term?.by_category || {};
+    const byPrio = memStats?.short_term?.by_priority || {};
+    const cats = Object.keys(byCat);
+    const prios = ["P0", "P1", "P2", "P3"].filter((p) => byPrio[p]);
+    if (!cats.length || !prios.length) return { backgroundColor: "transparent" };
+    const data: number[][] = [];
+    cats.forEach((cat, ci) => { prios.forEach((prio, pi) => { const count = items.filter((i) => i.category === cat && i.priority === prio).length; data.push([pi, ci, count]); }); });
+    return { backgroundColor: "transparent", tooltip: { formatter: (p: any) => `${CAT_LABELS[cats[p.data[1]]] || cats[p.data[1]]} × ${prios[p.data[0]]}: ${p.data[2]}条` }, grid: { left: 90, right: 40, top: 10, bottom: 40 }, xAxis: { type: "category" as const, data: prios, axisLabel: { color: "#94a3b8", fontSize: 11 } }, yAxis: { type: "category" as const, data: cats.map((c) => CAT_LABELS[c] || c), axisLabel: { color: "#94a3b8", fontSize: 10 } }, visualMap: { min: 0, max: Math.max(...data.map((d) => d[2]), 1), show: true, orient: "vertical" as const, right: 0, top: "center", textStyle: { color: "#94a3b8", fontSize: 10 }, inRange: { color: ["#1e293b", "#3b82f6", "#06b6d4"] } }, series: [{ type: "heatmap" as const, data, label: { show: true, color: "#fff", fontSize: 10, formatter: (p: any) => p.data[2] || "" }, itemStyle: { borderColor: "#0f172a", borderWidth: 2 } }] };
+  }, [memStats, items]);
+
+  const importanceGaugeOption = useMemo(() => {
+    const total = memStats?.short_term?.total || 0;
+    const p0 = memStats?.short_term?.by_priority?.P0 || 0;
+    const p1 = memStats?.short_term?.by_priority?.P1 || 0;
+    const importanceScore = total > 0 ? ((p0 * 100 + p1 * 60) / total) : 0;
+    return {
+      backgroundColor: "transparent",
+      series: [{
+        type: "gauge", center: ["50%", "55%"], radius: "80%",
+        min: 0, max: 100, splitNumber: 5,
+        axisLine: { lineStyle: { width: 10, color: [[0.25, "#10b981"], [0.5, "#f59e0b"], [0.75, "#f97316"], [1, "#ef4444"]] } },
+        pointer: { length: "60%", width: 5, itemStyle: { color: "#94a3b8" } },
+        axisTick: { distance: -8, length: 6, lineStyle: { color: "#475569", width: 1 } },
+        splitLine: { distance: -10, length: 12, lineStyle: { color: "#64748b", width: 2 } },
+        axisLabel: { color: "#94a3b8", fontSize: 9, distance: 16 },
+        detail: { formatter: "{value}分", color: "#f1f5f9", fontSize: 16, fontWeight: 800, offsetCenter: [0, "60%"] },
+        title: { offsetCenter: [0, "80%"], color: "#94a3b8", fontSize: 10 },
+        data: [{ value: Math.round(importanceScore), name: "记忆重要度" }],
+      }],
+    };
+  }, [memStats]);
+
+  const associationScatterOption = useMemo(() => {
+    const byCat = memStats?.short_term?.by_category || {};
+    const byPrio = memStats?.short_term?.by_priority || {};
+    const cats = Object.keys(byCat);
+    if (!cats.length) return { backgroundColor: "transparent" };
+    const scatterData = cats.map((cat, i) => {
+      const count = byCat[cat] as number || 0;
+      const p0Count = items.filter((item) => item.category === cat && item.priority === "P0").length;
+      return [i, count, p0Count, CAT_LABELS[cat] || cat];
+    });
+    return {
+      backgroundColor: "transparent",
+      tooltip: { formatter: (p: any) => `${p.data[3]}: ${p.data[1]}条 (P0: ${p.data[2]}条)` },
+      grid: { left: 50, right: 30, top: 30, bottom: 50 },
+      xAxis: { type: "category" as const, data: cats.map((c) => CAT_LABELS[c] || c), axisLabel: { color: "#94a3b8", fontSize: 10, rotate: 20 } },
+      yAxis: { type: "value" as const, name: "记忆数量", nameTextStyle: { color: "#94a3b8", fontSize: 10 }, axisLabel: { color: "#94a3b8" }, splitLine: { lineStyle: { color: "#1e293b" } } },
+      visualMap: { min: 0, max: Math.max(...scatterData.map((d) => d[2] as number), 1), show: false, inRange: { color: ["#3b82f6", "#f59e0b", "#ef4444"] } },
+      series: [{
+        type: "scatter" as const, data: scatterData,
+        symbolSize: (d: any[]) => Math.max(10, Number(d[1]) * 3),
+        itemStyle: { borderColor: "#0f172a", borderWidth: 1 },
+        label: { show: true, formatter: (p: any) => `${p.data[1]}条`, color: "#e5e7eb", fontSize: 10, position: "top" as const },
+      }],
+    };
+  }, [memStats, items]);
+
   return (
     <div>
-      <div className="row cols-3">
-        <ScadaCard title="Collection" value={<span className="compact-card-value">{system.rag_index.collection_name}</span>} sub={system.rag_index.persist_directory} glowClass="glow-blue" />
-        <ScadaCard title="Chunks" value={system.rag_index.collection_count} sub="正式 RAG 索引" glowClass="glow-green" />
-        <ScadaCard title="Backend" value={<span className="compact-card-value">{system.rag_index.embedding_backend}</span>} sub={system.rag_index.fallback_embedding_used ? "fallback enabled" : "external embedding"} glowClass="glow-orange" />
-      </div>
-
-      <div className="preset-query-bar">
-        {PRESET_QUERIES.map((item) => (
-          <button
-            key={item}
-            type="button"
-            className={`preset-query ${item === query ? "active" : ""}`}
-            onClick={() => onSearch(item)}
-          >
-            {item}
-          </button>
-        ))}
-      </div>
-      <div className="inline-search">
-        <input
-          className="scada-input"
-          value={query}
-          onChange={(event) => onQueryChange(event.target.value)}
-          placeholder="输入知识库检索词"
-        />
-        <button className="scada-btn" type="button" onClick={() => onSearch()} disabled={loading}>
-          {loading ? "检索中..." : "检索"}
-        </button>
-      </div>
-      <div className="table-caption">mode={mode}，结果字段来自 source_file / section_title / rule_id / sop_id / case_id / doc_type / distance / score。</div>
-
-      <div className="scada-table-wrap">
-        <table className="scada-table dense evidence-table">
-          <thead>
-            <tr>
-              <th>source_file</th>
-              <th>section_title</th>
-              <th>ID</th>
-              <th>doc_type</th>
-              <th>score</th>
-              <th>distance</th>
-              <th>matched_text 摘要</th>
-            </tr>
-          </thead>
-          <tbody>
-            {results.map((item, index) => (
-              <tr key={`${item.source_file}-${item.section_title}-${index}`}>
-                <td className="mono-cell">{item.source_file}</td>
-                <td>{item.section_title || "—"}</td>
-                <td className="mono-cell">{item.rule_id || item.sop_id || item.case_id || "—"}</td>
-                <td>{item.doc_type || "—"}</td>
-                <td className="mono-cell">{formatNumber(item.score)}</td>
-                <td className="mono-cell">{formatNumber(item.distance)}</td>
-                <td>{item.matched_text}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
-
-interface MemoryFilterState {
-  module: MemoryModule;
-  priority: MemoryPriority | "";
-  keyword: string;
-  start: string;
-  end: string;
-  riskType: string;
-  offset: number;
-  limit: number;
-}
-
-function MemoryPanel({
-  stats,
-  loading,
-  error,
-  filters,
-  onFilterChange,
-}: {
-  stats: MemoryStatisticsResponse | null;
-  loading: boolean;
-  error: string;
-  filters: MemoryFilterState;
-  onFilterChange: (patch: Partial<MemoryFilterState>) => void;
-}) {
-  const [view, setView] = useState<"short_term" | "long_term" | "warning_experience">("short_term");
-  const exportParams: MemoryStatisticsParams = {
-    module: filters.module,
-    priority: filters.priority,
-    keyword: filters.keyword,
-    start_time: filters.start,
-    end_time: filters.end,
-    risk_type: filters.riskType,
-  };
-  const records = stats?.recent_records ?? [];
-  const total = stats?.total_records ?? 0;
-  const canPrev = filters.offset > 0;
-  const canNext = filters.offset + filters.limit < total;
-
-  async function runExport(format: "csv" | "xlsx" | "pdf") {
-    await downloadMemoryExport(exportParams, format);
-  }
-
-  return (
-    <div className="memory-dashboard">
-      {error && <div className="alert error">{error}</div>}
-      {loading && <div className="table-caption">正在刷新记忆统计...</div>}
-
-      <div className="row cols-4 memory-kpi-grid">
-        {(stats?.kpis ?? []).map((kpi) => (
-          <ScadaCard
-            key={kpi.key}
-            title={kpi.label}
-            value={<span className="compact-card-value">{String(kpi.value)}{kpi.unit ? ` ${kpi.unit}` : ""}</span>}
-            sub={kpi.key === "last_write_time" ? "AgentFS operation_log" : stats?.generated_at}
-            glowClass={kpi.status === "warning" ? "glow-orange" : kpi.status === "danger" ? "glow-red" : "glow-green"}
-          />
-        ))}
-      </div>
-
-      <div className="memory-filter-panel">
-        <label>
-          <span className="scada-label">模块</span>
-          <select
-            className="scada-select"
-            value={filters.module}
-            onChange={(event) => onFilterChange({ module: event.target.value as MemoryModule })}
-          >
-            <option value="all">全部</option>
-            <option value="short_term">短期记忆</option>
-            <option value="long_term">长期记忆</option>
-            <option value="warning_experience">预警经验</option>
+      <div className="scada-card" style={{ marginBottom: 14 }}>
+        <div className="risk-report-header">
+          <div className="risk-report-title">🧠 短期记忆库</div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <span className="tag tag-blue">总计: {total} 条</span>
+            <button className="scada-btn secondary" style={{ fontSize: 11, padding: "2px 8px" }} type="button" onClick={() => handleMigrate(items.map((i) => i.id))}>⬆️ 全部迁移</button>
+            <button className="scada-btn secondary" style={{ fontSize: 11, padding: "2px 8px" }} type="button" onClick={() => setShowExport(!showExport)}>📤 导出</button>
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
+          <input className="scada-input" placeholder="搜索..." value={search} onChange={(e) => { setSearch(e.target.value); setPage(0); }} style={{ width: 200 }} />
+          <select className="scada-input" value={filterCat} onChange={(e) => { setFilterCat(e.target.value); setPage(0); }} style={{ width: 140 }}>
+            <option value="">全部分类</option>
+            <option value="inference">推理过程</option><option value="warning">预警记录</option><option value="experience">预警经验</option><option value="context">上下文</option>
           </select>
-        </label>
-        <label>
-          <span className="scada-label">优先级</span>
-          <select
-            className="scada-select"
-            value={filters.priority}
-            onChange={(event) => onFilterChange({ priority: event.target.value as MemoryPriority | "" })}
-          >
-            <option value="">全部</option>
-            {MEMORY_RULES.map((item) => <option key={item.priority} value={item.priority}>{item.priority}</option>)}
-          </select>
-        </label>
-        <label>
-          <span className="scada-label">开始时间</span>
-          <input className="scada-input" type="date" value={filters.start} onChange={(event) => onFilterChange({ start: event.target.value })} />
-        </label>
-        <label>
-          <span className="scada-label">结束时间</span>
-          <input className="scada-input" type="date" value={filters.end} onChange={(event) => onFilterChange({ end: event.target.value })} />
-        </label>
-        <label>
-          <span className="scada-label">关键词</span>
-          <input className="scada-input" value={filters.keyword} onChange={(event) => onFilterChange({ keyword: event.target.value })} placeholder="摘要、路径、metadata" />
-        </label>
-        <label>
-          <span className="scada-label">风险类型</span>
-          <input className="scada-input" value={filters.riskType} onChange={(event) => onFilterChange({ riskType: event.target.value })} placeholder="粉尘涉爆 / 危化品" />
-        </label>
-        <div className="memory-export-actions">
-          <button className="scada-btn secondary" type="button" onClick={() => onFilterChange({ module: "all", priority: "", keyword: "", start: "", end: "", riskType: "", offset: 0 })}>
-            清空筛选
-          </button>
-          <button className="scada-btn" type="button" onClick={() => runExport("csv")}>CSV</button>
-          <button className="scada-btn" type="button" onClick={() => runExport("xlsx")}>Excel</button>
-          <button className="scada-btn" type="button" onClick={() => runExport("pdf")}>PDF</button>
+          <button className="scada-btn secondary" type="button" onClick={loadData}>🔄 刷新</button>
         </div>
       </div>
 
-      <div className="memory-view-tabs">
-        {[
-          ["short_term", "短期记忆"],
-          ["long_term", "长期记忆"],
-          ["warning_experience", "预警经验"],
-        ].map(([id, label]) => (
-          <button
-            key={id}
-            type="button"
-            className={`preset-query ${view === id ? "active" : ""}`}
-            onClick={() => setView(id as "short_term" | "long_term" | "warning_experience")}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
+      {showExport && <ExportDialog memoryType="short" onClose={() => setShowExport(false)} />}
 
-      {stats ? (
+      {memStats && (
         <>
-          <div className="row cols-2">
-            <MemoryTrendChart
-              data={stats.charts.trend}
-              onSeriesClick={(series) => {
-                if (series === "short_term" || series === "long_term" || series === "warning_experience") {
-                  onFilterChange({ module: series as MemoryModule });
-                }
-              }}
-            />
-            <MemoryHeatmapChart
-              data={stats.charts.heatmap}
-              onClick={(riskType, priority) => onFilterChange({ riskType, priority: priority as MemoryPriority })}
-            />
+          <div className="row cols-4" style={{ marginBottom: 14 }}>
+            <StatCard value={memStats.short_term?.total ?? 0} label="短期记忆总数" color="#3b82f6" icon="🧠" />
+            <StatCard value={memStats.short_term?.by_priority?.P0 ?? 0} label="P0 紧急" color="#ef4444" icon="🔴" />
+            <StatCard value={Object.keys(memStats.short_term?.by_category || {}).length} label="分类数量" color="#10b981" icon="📂" />
+            <StatCard value={Object.keys(memStats.short_term?.by_enterprise || {}).length} label="关联企业" color="#f59e0b" icon="🏢" />
           </div>
-
-          {view === "short_term" && <ShortTermDashboard stats={stats} onFilterChange={onFilterChange} />}
-          {view === "long_term" && <LongTermDashboard stats={stats} onFilterChange={onFilterChange} />}
-          {view === "warning_experience" && <WarningExperienceDashboard stats={stats} onFilterChange={onFilterChange} />}
-
-          <MemoryRecordsTable
-            records={records}
-            total={total}
-            offset={filters.offset}
-            limit={filters.limit}
-            canPrev={canPrev}
-            canNext={canNext}
-            onPrev={() => onFilterChange({ offset: Math.max(0, filters.offset - filters.limit) })}
-            onNext={() => onFilterChange({ offset: filters.offset + filters.limit })}
-          />
+          <div className="row cols-2" style={{ marginBottom: 14 }}>
+            <div className="scada-card"><div className="risk-report-title" style={{ marginBottom: 10 }}>📊 分类分布</div><ReactECharts option={catPieOption} style={{ height: 280 }} /></div>
+            <div className="scada-card"><div className="risk-report-title" style={{ marginBottom: 10 }}>📈 优先级分布</div><ReactECharts option={prioBarOption} style={{ height: 280 }} /></div>
+          </div>
+          <div className="row cols-2" style={{ marginBottom: 14 }}>
+            <div className="scada-card"><div className="risk-report-title" style={{ marginBottom: 10 }}>📈 入库时间趋势</div><ReactECharts option={timelineOption} style={{ height: 280 }} /></div>
+            <div className="scada-card"><div className="risk-report-title" style={{ marginBottom: 10 }}>🏢 企业关联TOP8</div><ReactECharts option={enterpriseBarOption} style={{ height: 280 }} /></div>
+          </div>
+          <div className="row cols-2" style={{ marginBottom: 14 }}>
+            <div className="scada-card"><div className="risk-report-title" style={{ marginBottom: 10 }}>⏱️ 记忆重要度评分</div><ReactECharts option={importanceGaugeOption} style={{ height: 220 }} /></div>
+            <div className="scada-card"><div className="risk-report-title" style={{ marginBottom: 10 }}>🎯 分类关联强度散点图</div><ReactECharts option={associationScatterOption} style={{ height: 220 }} /></div>
+          </div>
+          <div className="scada-card" style={{ marginBottom: 14 }}>
+            <div className="risk-report-title" style={{ marginBottom: 10 }}>🔥 分类×优先级关联热力图</div>
+            <ReactECharts option={heatmapOption} style={{ height: Math.max(200, Object.keys(memStats.short_term?.by_category || {}).length * 40 + 80) }} />
+          </div>
         </>
-      ) : (
-        <div className="empty-state">等待记忆统计接口返回数据</div>
       )}
-    </div>
-  );
-}
 
-function ShortTermDashboard({
-  stats,
-  onFilterChange,
-}: {
-  stats: MemoryStatisticsResponse;
-  onFilterChange: (patch: Partial<MemoryFilterState>) => void;
-}) {
-  const short = stats.short_term;
-  const tokenRatio = short.token_limit ? Math.round((short.token_usage / short.token_limit) * 100) : 0;
-  return (
-    <div className="memory-subpanel">
-      <div className="row cols-4">
-        <ScadaCard title="短期记忆总数" value={short.total} sub="runtime ShortTermMemory" glowClass="glow-blue" />
-        <ScadaCard title="Token 使用" value={`${short.token_usage}/${short.token_limit}`} sub={`${tokenRatio}% of limit`} glowClass={tokenRatio > 80 ? "glow-orange" : "glow-green"} />
-        <ScadaCard title="P1 摘要/待归档" value={short.summary_count} sub={`待归档 ${short.p1_pending_archive}`} glowClass="glow-orange" />
-        <ScadaCard title="压缩数量" value={short.compressed_count} sub="P2/P1 清理痕迹" glowClass="glow-white" />
-      </div>
-      <div className="row cols-2" style={{ marginTop: 12 }}>
-        <MemoryBarChart
-          title="P0-P3 优先级分布"
-          data={Object.entries(short.priority_distribution).map(([name, value]) => ({ name, value }))}
-          onClick={(name) => onFilterChange({ priority: name as MemoryPriority })}
-        />
-        <div className="scada-table-wrap">
-          <table className="scada-table dense memory-rules-table">
-            <thead>
-              <tr><th>优先级</th><th>机制</th><th>生命周期</th></tr>
-            </thead>
+      <div className="scada-card">
+        {items.length === 0 ? (
+          <div className="empty-state"><div className="empty-state-icon">🧠</div><div>短期记忆库为空</div></div>
+        ) : (
+          <table className="scada-table">
+            <thead><tr><th>优先级</th><th>分类</th><th>内容</th><th>企业ID</th><th>时间</th><th>标签</th><th>操作</th></tr></thead>
             <tbody>
-              {MEMORY_RULES.map((item) => (
-                <tr key={item.priority}>
-                  <td><PriorityBadge priority={item.priority} /></td>
-                  <td>{item.mechanism}</td>
-                  <td>{item.lifecycle}</td>
+              {items.map((item) => (
+                <tr key={item.id}>
+                  <td><span className="tag" style={{ background: PRIO_BG[item.priority] || PRIO_BG.P2, color: PRIO_COLORS[item.priority] || PRIO_COLORS.P2, fontWeight: 700, fontSize: 10 }}>{item.priority}</span></td>
+                  <td><span className="tag tag-cyan" style={{ fontSize: 10 }}>{CAT_LABELS[item.category] || item.category}</span></td>
+                  <td style={{ maxWidth: 400, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 12 }}>{item.text}</td>
+                  <td className="font-mono" style={{ fontSize: 11 }}>{item.enterprise_id || "—"}</td>
+                  <td style={{ fontSize: 11, color: "#94a3b8" }}>{item.time}</td>
+                  <td>{(item.tags || []).slice(0, 2).map((t: string) => <span key={t} className="tag" style={{ fontSize: 9, background: "rgba(100,116,139,0.15)", color: "#94a3b8", margin: 1 }}>{t}</span>)}</td>
+                  <td>
+                    <div style={{ display: "flex", gap: 4 }}>
+                      <button className="scada-btn secondary" style={{ fontSize: 10, padding: "2px 6px" }} type="button" onClick={() => setDetailItem(item)}>📋 详情</button>
+                      <button className="scada-btn secondary" style={{ fontSize: 10, padding: "2px 6px" }} type="button" onClick={() => handleMigrate([item.id])}>⬆️ 迁移</button>
+                      <button className="scada-btn secondary" style={{ fontSize: 10, padding: "2px 6px", color: "#ef4444" }} type="button" onClick={() => handleDelete(item.id)}>🗑️</button>
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
-        </div>
+        )}
+        {total > pageSize && (
+          <div style={{ display: "flex", justifyContent: "center", gap: 8, marginTop: 12 }}>
+            <button className="scada-btn secondary" type="button" disabled={page === 0} onClick={() => setPage(page - 1)}>上一页</button>
+            <span style={{ color: "#94a3b8", lineHeight: "32px" }}>第 {page + 1} 页 / 共 {Math.ceil(total / pageSize)} 页</span>
+            <button className="scada-btn secondary" type="button" disabled={(page + 1) * pageSize >= total} onClick={() => setPage(page + 1)}>下一页</button>
+          </div>
+        )}
       </div>
+      {detailItem && <MemoryDetailModal item={detailItem} onClose={() => setDetailItem(null)} />}
     </div>
   );
 }
 
-function LongTermDashboard({
-  stats,
-  onFilterChange,
-}: {
-  stats: MemoryStatisticsResponse;
-  onFilterChange: (patch: Partial<MemoryFilterState>) => void;
-}) {
-  const fileBars = stats.long_term.files.map((item) => ({ name: item.label || item.path, value: item.entry_count }));
-  return (
-    <div className="memory-subpanel">
-      <div className="row cols-2">
-        <MemoryBarChart title="长期归档文件条目数" data={fileBars} onClick={(name) => onFilterChange({ keyword: name })} />
-        <MemoryDonutChart
-          title="长期记忆风险类型"
-          data={Object.entries(stats.long_term.risk_type_distribution).map(([name, value]) => ({ name, value }))}
-          onClick={(name) => onFilterChange({ riskType: name })}
-        />
-      </div>
-      <div className="scada-table-wrap" style={{ marginTop: 12 }}>
-        <table className="scada-table dense memory-archive-table">
-          <thead>
-            <tr>
-              <th>归档文件</th>
-              <th>优先级</th>
-              <th>条目</th>
-              <th>大小</th>
-              <th>更新时间</th>
-              <th>Checksum</th>
-            </tr>
-          </thead>
-          <tbody>
-            {stats.long_term.files.map((file) => (
-              <tr key={file.path} onClick={() => onFilterChange({ keyword: file.label || file.path })}>
-                <td className="mono-cell">{file.path}</td>
-                <td>{file.priority ? <PriorityBadge priority={file.priority} /> : "—"}</td>
-                <td className="mono-cell">{file.entry_count}</td>
-                <td className="mono-cell">{formatBytes(file.size)}</td>
-                <td className="mono-cell">{file.updated_at || "—"}</td>
-                <td className="mono-cell">{file.checksum?.slice(0, 12) || "—"}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
+function LongTermMemorySection() {
+  const [items, setItems] = useState<any[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [search, setSearch] = useState("");
+  const [filterCat, setFilterCat] = useState("");
+  const [page, setPage] = useState(0);
+  const [memStats, setMemStats] = useState<any>(null);
+  const [showExport, setShowExport] = useState(false);
+  const [detailItem, setDetailItem] = useState<any>(null);
+  const pageSize = 20;
 
-function WarningExperienceDashboard({
-  stats,
-  onFilterChange,
-}: {
-  stats: MemoryStatisticsResponse;
-  onFilterChange: (patch: Partial<MemoryFilterState>) => void;
-}) {
-  return (
-    <div className="memory-subpanel">
-      <div className="row cols-4">
-        <ScadaCard title="预警经验记录" value={stats.warning_experience.total} sub="历史经验 + 案例" glowClass="glow-orange" />
-        <ScadaCard title="RAG 命中片段" value={stats.warning_experience.rag_hit_count} sub={`collection ${stats.warning_experience.rag_collection_count}`} glowClass="glow-blue" />
-        <ScadaCard title="AgentFS WRITE" value={stats.agentfs_operations.counts.WRITE || 0} sub={stats.agentfs_operations.last_write_time || "无写入"} glowClass="glow-green" />
-        <ScadaCard title="DELETE/SNAPSHOT" value={`${stats.agentfs_operations.counts.DELETE || 0}/${stats.agentfs_operations.counts.SNAPSHOT || 0}`} sub="operation_log" glowClass="glow-white" />
-      </div>
-      <div className="row cols-2" style={{ marginTop: 12 }}>
-        <MemoryDonutChart
-          title="预警经验类型"
-          data={Object.entries(stats.warning_experience.type_distribution).map(([name, value]) => ({ name, value }))}
-          onClick={(name) => onFilterChange({ keyword: name })}
-        />
-        <MemoryDonutChart
-          title="风险类型占比"
-          data={Object.entries(stats.warning_experience.risk_type_distribution).map(([name, value]) => ({ name, value }))}
-          onClick={(name) => onFilterChange({ riskType: name })}
-        />
-      </div>
-    </div>
-  );
-}
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    const [resp, stats] = await Promise.all([
+      queryLongTermMemoryPaginated({
+        search: search || undefined,
+        category: filterCat || undefined,
+        limit: pageSize,
+        offset: page * pageSize,
+      }),
+      fetchMemoryStats(),
+    ]);
+    if (resp) { setItems(resp.items || []); setTotal(resp.total); }
+    if (stats) setMemStats(stats);
+    setLoading(false);
+  }, [search, filterCat, page]);
 
-function MemoryRecordsTable({
-  records,
-  total,
-  offset,
-  limit,
-  canPrev,
-  canNext,
-  onPrev,
-  onNext,
-}: {
-  records: MemoryRecord[];
-  total: number;
-  offset: number;
-  limit: number;
-  canPrev: boolean;
-  canNext: boolean;
-  onPrev: () => void;
-  onNext: () => void;
-}) {
-  return (
-    <div className="memory-records">
-      <div className="memory-table-head">
-        <div className="subtitle">明细记录</div>
-        <div className="table-caption">第 {offset + 1}-{Math.min(offset + limit, total)} 条 / 共 {total} 条</div>
-      </div>
-      <div className="scada-table-wrap">
-        <table className="scada-table dense memory-detail-table">
-          <thead>
-            <tr>
-              <th>模块</th>
-              <th>优先级</th>
-              <th>风险类型</th>
-              <th>来源 / 路径</th>
-              <th>更新时间</th>
-              <th>Token/Size</th>
-              <th>关联度</th>
-              <th>摘要</th>
-            </tr>
-          </thead>
-          <tbody>
-            {records.map((record) => (
-              <tr key={record.id}>
-                <td>{moduleLabel(record.module)}</td>
-                <td><PriorityBadge priority={record.priority} /></td>
-                <td>{record.risk_type || "未标注"}</td>
-                <td className="mono-cell">{record.source}<br />{record.path}</td>
-                <td className="mono-cell">{record.updated_at || record.created_at || "—"}</td>
-                <td className="mono-cell">{record.tokens ?? "—"} / {formatBytes(record.size)}</td>
-                <td className="mono-cell">{formatNumber(record.association_score)}</td>
-                <td>{record.summary || record.content}</td>
-              </tr>
-            ))}
-            {records.length === 0 && (
-              <tr>
-                <td colSpan={8}><div className="empty-state">当前筛选没有匹配记录</div></td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-      <div className="memory-pagination">
-        <button className="scada-btn secondary" type="button" disabled={!canPrev} onClick={onPrev}>上一页</button>
-        <button className="scada-btn secondary" type="button" disabled={!canNext} onClick={onNext}>下一页</button>
-      </div>
-    </div>
-  );
-}
+  useEffect(() => { loadData(); }, [loadData]);
 
-function AuditPanel({ system }: { system: KnowledgeSystemOverview }) {
+  const catPieOption = useMemo(() => {
+    const byCat = memStats?.long_term?.by_category || {};
+    const data = Object.entries(byCat).filter(([, v]) => (v as number) > 0).map(([k, v]) => ({
+      name: CAT_LABELS[k] || k, value: v as number, itemStyle: { color: CAT_COLORS[k] || "#64748b" },
+    }));
+    if (!data.length) data.push({ name: "暂无数据", value: 1, itemStyle: { color: "#334155" } });
+    return {
+      backgroundColor: "transparent",
+      tooltip: { trigger: "item" as const, formatter: "{b}: {c} ({d}%)" },
+      legend: { bottom: 0, textStyle: { color: "#94a3b8", fontSize: 10 } },
+      series: [{
+        type: "pie", radius: ["35%", "65%"], center: ["50%", "45%"], data,
+        label: { color: "#94a3b8", fontSize: 10, formatter: "{b}\n{c}条" },
+        emphasis: { itemStyle: { shadowBlur: 10, shadowOffsetX: 0, shadowColor: "rgba(0,0,0,0.5)" } },
+      }],
+    };
+  }, [memStats]);
+
+  const prioBarOption = useMemo(() => {
+    const byPrio = memStats?.long_term?.by_priority || {};
+    const prios = ["P0", "P1", "P2", "P3"];
+    return {
+      backgroundColor: "transparent",
+      tooltip: { trigger: "axis" as const },
+      grid: { left: 50, right: 20, top: 20, bottom: 30 },
+      xAxis: { type: "category" as const, data: prios, axisLabel: { color: "#94a3b8" } },
+      yAxis: { type: "value" as const, axisLabel: { color: "#94a3b8" }, splitLine: { lineStyle: { color: "#1e293b" } } },
+      series: [{
+        type: "bar" as const,
+        data: prios.map((p) => ({
+          value: byPrio[p] || 0,
+          itemStyle: { color: { type: "linear", x: 0, y: 1, x2: 0, y2: 0, colorStops: [{ offset: 0, color: PRIO_COLORS[p] + "88" }, { offset: 1, color: PRIO_COLORS[p] }] }, borderRadius: [6, 6, 0, 0] },
+        })),
+        barWidth: "40%",
+      }],
+    };
+  }, [memStats]);
+
+  const timelineOption = useMemo(() => {
+    const tl = memStats?.long_term?.timeline || {};
+    const entries = Object.entries(tl).sort(([a], [b]) => a.localeCompare(b));
+    if (!entries.length) return { backgroundColor: "transparent" };
+    return {
+      backgroundColor: "transparent",
+      tooltip: { trigger: "axis" as const },
+      grid: { left: 50, right: 20, top: 20, bottom: 50 },
+      xAxis: { type: "category" as const, data: entries.map(([d]) => d.slice(5)), axisLabel: { color: "#94a3b8", fontSize: 10 } },
+      yAxis: { type: "value" as const, axisLabel: { color: "#94a3b8" }, splitLine: { lineStyle: { color: "#1e293b" } } },
+      dataZoom: [{ type: "inside", start: 0, end: 100 }, { type: "slider", start: 0, end: 100, height: 20, bottom: 5, borderColor: "#334155", backgroundColor: "#0f172a", dataBackground: { lineStyle: { color: "#334155" }, areaStyle: { color: "#1e293b" } }, selectedDataBackground: { lineStyle: { color: "#10b981" }, areaStyle: { color: "rgba(16,185,129,0.2)" } }, textStyle: { color: "#94a3b8" } }],
+      series: [{
+        type: "line" as const, data: entries.map(([, v]) => v), smooth: true,
+        lineStyle: { color: "#10b981", width: 3 },
+        areaStyle: { color: { type: "linear", x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: "rgba(16,185,129,0.3)" }, { offset: 1, color: "rgba(16,185,129,0.05)" }] } },
+        itemStyle: { color: "#10b981" },
+      }],
+    };
+  }, [memStats]);
+
+  const sourceBarOption = useMemo(() => {
+    const bySource = memStats?.long_term?.by_source || {};
+    const top = Object.entries(bySource).sort(([, a], [, b]) => (b as number) - (a as number)).slice(0, 10);
+    if (!top.length) return { backgroundColor: "transparent" };
+    return {
+      backgroundColor: "transparent",
+      tooltip: { trigger: "axis" as const },
+      grid: { left: 100, right: 20, top: 20, bottom: 30 },
+      xAxis: { type: "value" as const, axisLabel: { color: "#94a3b8" }, splitLine: { lineStyle: { color: "#1e293b" } } },
+      yAxis: { type: "category" as const, data: top.map(([k]) => k.length > 15 ? k.slice(0, 15) + "..." : k), axisLabel: { color: "#94a3b8", fontSize: 10 } },
+      series: [{
+        type: "bar" as const,
+        data: top.map(([, v]) => ({
+          value: v as number,
+          itemStyle: { color: { type: "linear", x: 0, y: 0, x2: 1, y2: 0, colorStops: [{ offset: 0, color: "#10b981" }, { offset: 1, color: "#34d399" }] }, borderRadius: [0, 6, 6, 0] },
+        })),
+        barWidth: "50%",
+      }],
+    };
+  }, [memStats]);
+
+  const enterpriseBarOption = useMemo(() => {
+    const byEnt = memStats?.long_term?.by_enterprise || {};
+    const top = Object.entries(byEnt).sort(([, a], [, b]) => (b as number) - (a as number)).slice(0, 8);
+    if (!top.length) return { backgroundColor: "transparent" };
+    return {
+      backgroundColor: "transparent",
+      tooltip: { trigger: "axis" as const },
+      grid: { left: 80, right: 20, top: 20, bottom: 30 },
+      xAxis: { type: "value" as const, axisLabel: { color: "#94a3b8" }, splitLine: { lineStyle: { color: "#1e293b" } } },
+      yAxis: { type: "category" as const, data: top.map(([k]) => k.slice(0, 10)), axisLabel: { color: "#94a3b8", fontSize: 10 } },
+      series: [{
+        type: "bar" as const,
+        data: top.map(([, v]) => ({
+          value: v as number,
+          itemStyle: { color: { type: "linear", x: 0, y: 0, x2: 1, y2: 0, colorStops: [{ offset: 0, color: "#f59e0b" }, { offset: 1, color: "#fbbf24" }] }, borderRadius: [0, 6, 6, 0] },
+        })),
+        barWidth: "50%",
+      }],
+    };
+  }, [memStats]);
+
+  const heatmapOption = useMemo(() => {
+    const byCat = memStats?.long_term?.by_category || {};
+    const byPrio = memStats?.long_term?.by_priority || {};
+    const cats = Object.keys(byCat);
+    const prios = ["P0", "P1", "P2", "P3"].filter((p) => byPrio[p]);
+    if (!cats.length || !prios.length) return { backgroundColor: "transparent" };
+    const data: number[][] = [];
+    cats.forEach((cat, ci) => {
+      prios.forEach((prio, pi) => {
+        const count = items.filter((i) => i.category === cat && i.priority === prio).length;
+        data.push([pi, ci, count]);
+      });
+    });
+    return {
+      backgroundColor: "transparent",
+      tooltip: { formatter: (p: any) => `${CAT_LABELS[cats[p.data[1]]] || cats[p.data[1]]} × ${prios[p.data[0]]}: ${p.data[2]}条` },
+      grid: { left: 90, right: 40, top: 10, bottom: 40 },
+      xAxis: { type: "category" as const, data: prios, axisLabel: { color: "#94a3b8", fontSize: 11 } },
+      yAxis: { type: "category" as const, data: cats.map((c) => CAT_LABELS[c] || c), axisLabel: { color: "#94a3b8", fontSize: 10 } },
+      visualMap: { min: 0, max: Math.max(...data.map((d) => d[2]), 1), show: true, orient: "vertical" as const, right: 0, top: "center", textStyle: { color: "#94a3b8", fontSize: 10 }, inRange: { color: ["#1e293b", "#10b981", "#f59e0b"] } },
+      series: [{ type: "heatmap" as const, data, label: { show: true, color: "#fff", fontSize: 10, formatter: (p: any) => p.data[2] || "" }, itemStyle: { borderColor: "#0f172a", borderWidth: 2 } }],
+    };
+  }, [memStats, items]);
+
+  const SOURCE_COLORS = ["#10b981", "#34d399", "#06b6d4", "#22d3ee", "#3b82f6", "#6366f1", "#8b5cf6", "#a78bfa", "#f59e0b", "#f97316", "#ef4444", "#ec4899"];
+
+  const ltImportanceGaugeOption = useMemo(() => {
+    const total = memStats?.long_term?.total || 0;
+    const verified = memStats?.long_term?.verified_count || 0;
+    const verifiedRatio = total > 0 ? Math.round((verified / total) * 100) : 0;
+    return {
+      backgroundColor: "transparent",
+      series: [{
+        type: "gauge", center: ["50%", "55%"], radius: "80%",
+        min: 0, max: 100, splitNumber: 5,
+        axisLine: { lineStyle: { width: 10, color: [[0.25, "#10b981"], [0.5, "#f59e0b"], [0.75, "#f97316"], [1, "#ef4444"]] } },
+        pointer: { length: "60%", width: 5, itemStyle: { color: "#94a3b8" } },
+        axisTick: { distance: -8, length: 6, lineStyle: { color: "#475569", width: 1 } },
+        splitLine: { distance: -10, length: 12, lineStyle: { color: "#64748b", width: 2 } },
+        axisLabel: { color: "#94a3b8", fontSize: 9, distance: 16 },
+        detail: { formatter: "{value}%", color: "#f1f5f9", fontSize: 16, fontWeight: 800, offsetCenter: [0, "60%"] },
+        title: { offsetCenter: [0, "80%"], color: "#94a3b8", fontSize: 10 },
+        data: [{ value: verifiedRatio, name: "验证覆盖率" }],
+      }],
+    };
+  }, [memStats]);
+
+  const ltSourcePieOption = useMemo(() => {
+    const bySource = memStats?.long_term?.by_source || {};
+    const entries = Object.entries(bySource).filter(([, v]) => (v as number) > 0);
+    const data = entries.map(([k, v], i) => ({
+      name: k.length > 20 ? k.slice(0, 20) + "..." : k,
+      value: v as number,
+      itemStyle: { color: SOURCE_COLORS[i % SOURCE_COLORS.length] },
+    }));
+    if (!data.length) data.push({ name: "暂无数据", value: 1, itemStyle: { color: "#334155" } });
+    return {
+      backgroundColor: "transparent",
+      tooltip: { trigger: "item" as const, formatter: "{b}: {c} ({d}%)" },
+      legend: { bottom: 0, textStyle: { color: "#94a3b8", fontSize: 9 }, type: "scroll" as const },
+      series: [{
+        type: "pie", radius: ["30%", "60%"], center: ["50%", "45%"], data,
+        label: { color: "#94a3b8", fontSize: 9, formatter: "{b}" },
+        emphasis: { itemStyle: { shadowBlur: 10, shadowOffsetX: 0, shadowColor: "rgba(0,0,0,0.5)" } },
+      }],
+    };
+  }, [memStats]);
+
+  const ltEnterpriseHeatmapOption = useMemo(() => {
+    const byEnt = memStats?.long_term?.by_enterprise || {};
+    const byCat = memStats?.long_term?.by_category || {};
+    const topEnts = Object.entries(byEnt).sort(([, a], [, b]) => (b as number) - (a as number)).slice(0, 8).map(([k]) => k);
+    const cats = Object.keys(byCat);
+    if (!topEnts.length || !cats.length) return { backgroundColor: "transparent" };
+    const data: number[][] = [];
+    cats.forEach((cat, ci) => {
+      topEnts.forEach((ent, ei) => {
+        const count = items.filter((i) => i.category === cat && i.enterprise_id === ent).length;
+        data.push([ei, ci, count]);
+      });
+    });
+    return {
+      backgroundColor: "transparent",
+      tooltip: { formatter: (p: any) => `${CAT_LABELS[cats[p.data[1]]] || cats[p.data[1]]} × ${topEnts[p.data[0]].slice(0, 10)}: ${p.data[2]}条` },
+      grid: { left: 100, right: 40, top: 10, bottom: 60 },
+      xAxis: { type: "category" as const, data: topEnts.map((e) => e.slice(0, 8)), axisLabel: { color: "#94a3b8", fontSize: 9, rotate: 30 } },
+      yAxis: { type: "category" as const, data: cats.map((c) => CAT_LABELS[c] || c), axisLabel: { color: "#94a3b8", fontSize: 10 } },
+      visualMap: { min: 0, max: Math.max(...data.map((d) => d[2]), 1), show: true, orient: "vertical" as const, right: 0, top: "center", textStyle: { color: "#94a3b8", fontSize: 10 }, inRange: { color: ["#1e293b", "#10b981", "#34d399", "#f59e0b"] } },
+      series: [{ type: "heatmap" as const, data, label: { show: true, color: "#fff", fontSize: 9, formatter: (p: any) => p.data[2] || "" }, itemStyle: { borderColor: "#0f172a", borderWidth: 2 } }],
+    };
+  }, [memStats, items]);
+
   return (
     <div>
-      <div className="row cols-4">
-        <ScadaCard title="总体结论" value={<span className="compact-card-value">{system.overview.audit_status}</span>} sub="知识库系统审计" glowClass="glow-yellow" />
-        <ScadaCard title="PASS" value={system.overview.pass_count} glowClass="glow-green" />
-        <ScadaCard title="WARN" value={system.overview.warn_count} glowClass="glow-orange" />
-        <ScadaCard title="FAIL" value={system.overview.fail_count} glowClass="glow-green" />
-      </div>
-      <div className="warn-grid">
-        {system.audit_warnings.map((warning) => (
-          <div className="warn-item" key={warning}>
-            <StatusBadge tone="warning" label="WARN" />
-            <span>{warning}</span>
+      <div className="scada-card" style={{ marginBottom: 14 }}>
+        <div className="risk-report-header">
+          <div className="risk-report-title">💾 长期记忆库</div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <span className="tag tag-emerald">总计: {total} 条</span>
+            <button className="scada-btn secondary" style={{ fontSize: 11, padding: "2px 8px" }} type="button" onClick={() => setShowExport(!showExport)}>📤 导出</button>
           </div>
-        ))}
+        </div>
+        <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
+          <input className="scada-input" placeholder="搜索..." value={search} onChange={(e) => { setSearch(e.target.value); setPage(0); }} style={{ width: 200 }} />
+          <select className="scada-input" value={filterCat} onChange={(e) => { setFilterCat(e.target.value); setPage(0); }} style={{ width: 140 }}>
+            <option value="">全部分类</option>
+            <option value="enterprise_data">企业数据</option>
+            <option value="warning_experience">预警经验</option>
+            <option value="knowledge">知识库</option>
+            <option value="regulation">法规标准</option>
+            <option value="accident_case">事故案例</option>
+          </select>
+          <button className="scada-btn secondary" type="button" onClick={loadData}>🔄 刷新</button>
+        </div>
+      </div>
+
+      {showExport && <ExportDialog memoryType="long" onClose={() => setShowExport(false)} />}
+
+      {memStats && (
+        <>
+          <div className="row cols-4" style={{ marginBottom: 14 }}>
+            <StatCard value={memStats.long_term?.total ?? 0} label="长期记忆总数" color="#10b981" icon="💾" />
+            <StatCard value={memStats.long_term?.by_priority?.P0 ?? 0} label="P0 紧急" color="#ef4444" icon="🔴" />
+            <StatCard value={Object.keys(memStats.long_term?.by_category || {}).length} label="分类数量" color="#3b82f6" icon="📂" />
+            <StatCard value={Object.keys(memStats.long_term?.by_enterprise || {}).length} label="关联企业" color="#f59e0b" icon="🏢" />
+          </div>
+          <div className="row cols-2" style={{ marginBottom: 14 }}>
+            <div className="scada-card">
+              <div className="risk-report-title" style={{ marginBottom: 10 }}>📊 分类分布</div>
+              <ReactECharts option={catPieOption} style={{ height: 280 }} />
+            </div>
+            <div className="scada-card">
+              <div className="risk-report-title" style={{ marginBottom: 10 }}>📈 优先级分布</div>
+              <ReactECharts option={prioBarOption} style={{ height: 280 }} />
+            </div>
+          </div>
+          <div className="row cols-2" style={{ marginBottom: 14 }}>
+            <div className="scada-card">
+              <div className="risk-report-title" style={{ marginBottom: 10 }}>📈 入库时间趋势</div>
+              <ReactECharts option={timelineOption} style={{ height: 280 }} />
+            </div>
+            <div className="scada-card">
+              <div className="risk-report-title" style={{ marginBottom: 10 }}>📁 数据来源TOP10</div>
+              <ReactECharts option={sourceBarOption} style={{ height: 280 }} />
+            </div>
+          </div>
+          <div className="row cols-2" style={{ marginBottom: 14 }}>
+            <div className="scada-card">
+              <div className="risk-report-title" style={{ marginBottom: 10 }}>🏢 企业关联TOP8</div>
+              <ReactECharts option={enterpriseBarOption} style={{ height: 280 }} />
+            </div>
+            <div className="scada-card">
+              <div className="risk-report-title" style={{ marginBottom: 10 }}>⏱️ 验证覆盖率</div>
+              <ReactECharts option={ltImportanceGaugeOption} style={{ height: 220 }} />
+            </div>
+          </div>
+          <div className="row cols-2" style={{ marginBottom: 14 }}>
+            <div className="scada-card">
+              <div className="risk-report-title" style={{ marginBottom: 10 }}>📦 数据源分布</div>
+              <ReactECharts option={ltSourcePieOption} style={{ height: 280 }} />
+            </div>
+            <div className="scada-card">
+              <div className="risk-report-title" style={{ marginBottom: 10 }}>🔥 企业×分类关联热力图</div>
+              <ReactECharts option={ltEnterpriseHeatmapOption} style={{ height: 280 }} />
+            </div>
+          </div>
+          <div className="scada-card" style={{ marginBottom: 14 }}>
+            <div className="risk-report-title" style={{ marginBottom: 10 }}>🔥 分类×优先级关联热力图</div>
+            <ReactECharts option={heatmapOption} style={{ height: Math.max(200, Object.keys(memStats.long_term?.by_category || {}).length * 40 + 80) }} />
+          </div>
+        </>
+      )}
+
+      <div className="scada-card">
+        {items.length === 0 ? (
+          <div className="empty-state"><div className="empty-state-icon">💾</div><div>长期记忆库为空</div></div>
+        ) : (
+          <table className="scada-table">
+            <thead><tr><th>优先级</th><th>分类</th><th>内容</th><th>数据源</th><th>企业ID</th><th>时间</th><th>已验证</th><th>操作</th></tr></thead>
+            <tbody>
+              {items.map((item) => (
+                <tr key={item.id}>
+                  <td><span className="tag" style={{ background: PRIO_BG[item.priority] || PRIO_BG.P1, color: PRIO_COLORS[item.priority] || PRIO_COLORS.P1, fontWeight: 700, fontSize: 10 }}>{item.priority}</span></td>
+                  <td><span className="tag tag-cyan" style={{ fontSize: 10 }}>{CAT_LABELS[item.category] || item.category}</span></td>
+                  <td style={{ maxWidth: 350, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 12 }}>{item.text}</td>
+                  <td style={{ fontSize: 11, color: "#94a3b8" }}>{item.data_source || "—"}</td>
+                  <td className="font-mono" style={{ fontSize: 11 }}>{item.enterprise_id || "—"}</td>
+                  <td style={{ fontSize: 11, color: "#94a3b8" }}>{item.time}</td>
+                  <td>{item.verified ? <span style={{ color: "#10b981" }}>✅</span> : <span style={{ color: "#64748b" }}>—</span>}</td>
+                  <td><button className="scada-btn secondary" style={{ fontSize: 10, padding: "2px 6px" }} type="button" onClick={() => setDetailItem(item)}>📋 详情</button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+        {total > pageSize && (
+          <div style={{ display: "flex", justifyContent: "center", gap: 8, marginTop: 12 }}>
+            <button className="scada-btn secondary" type="button" disabled={page === 0} onClick={() => setPage(page - 1)}>上一页</button>
+            <span style={{ color: "#94a3b8", lineHeight: "32px" }}>第 {page + 1} 页 / 共 {Math.ceil(total / pageSize)} 页</span>
+            <button className="scada-btn secondary" type="button" disabled={(page + 1) * pageSize >= total} onClick={() => setPage(page + 1)}>下一页</button>
+          </div>
+        )}
+      </div>
+      {detailItem && <MemoryDetailModal item={detailItem} onClose={() => setDetailItem(null)} />}
+    </div>
+  );
+}
+
+function ApprovalSection() {
+  const [approvals, setApprovals] = useState<any[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [filterStatus, setFilterStatus] = useState("");
+
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    const resp = await fetchApprovals({ status: filterStatus || undefined, limit: 50 });
+    if (resp) { setApprovals(resp.items || []); setTotal(resp.total); }
+    setLoading(false);
+  }, [filterStatus]);
+
+  useEffect(() => { loadData(); }, [loadData]);
+
+  const handleDecide = useCallback(async (id: string, decision: string) => {
+    const comment = decision === "approved" ? "审批通过" : "需要进一步修改";
+    await decideApproval(id, decision, "admin", comment);
+    loadData();
+  }, [loadData]);
+
+  return (
+    <div>
+      <div className="scada-card" style={{ marginBottom: 14 }}>
+        <div className="risk-report-header">
+          <div className="risk-report-title">📋 管理员审批工作流</div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <span className="tag tag-orange">待审批: {approvals.filter((a) => a.status === "pending").length}</span>
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+          <select className="scada-input" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} style={{ width: 120 }}>
+            <option value="">全部状态</option>
+            <option value="pending">待审批</option>
+            <option value="approved">已批准</option>
+            <option value="rejected">已驳回</option>
+          </select>
+          <button className="scada-btn secondary" type="button" onClick={loadData}>🔄 刷新</button>
+        </div>
+      </div>
+
+      <div className="scada-card">
+        {approvals.length === 0 ? (
+          <div className="empty-state"><div className="empty-state-icon">📋</div><div>暂无审批记录</div></div>
+        ) : (
+          <table className="scada-table">
+            <thead><tr><th>ID</th><th>目标</th><th>操作</th><th>发起人</th><th>状态</th><th>创建时间</th><th>决策</th></tr></thead>
+            <tbody>
+              {approvals.map((a) => (
+                <tr key={a.id}>
+                  <td className="font-mono" style={{ fontSize: 11 }}>{a.id}</td>
+                  <td style={{ fontSize: 12 }}>{a.target_id}</td>
+                  <td style={{ fontSize: 12 }}>{a.action}</td>
+                  <td style={{ fontSize: 12 }}>{a.actor}</td>
+                  <td>
+                    <span className="tag" style={{
+                      background: a.status === "pending" ? "rgba(245,158,11,0.15)" : a.status === "approved" ? "rgba(16,185,129,0.15)" : "rgba(239,68,68,0.15)",
+                      color: a.status === "pending" ? "#f59e0b" : a.status === "approved" ? "#10b981" : "#ef4444",
+                      fontWeight: 700,
+                    }}>
+                      {a.status === "pending" ? "待审批" : a.status === "approved" ? "已批准" : "已驳回"}
+                    </span>
+                  </td>
+                  <td style={{ fontSize: 11, color: "#94a3b8" }}>{a.created_at}</td>
+                  <td>
+                    {a.status === "pending" && (
+                      <div style={{ display: "flex", gap: 4 }}>
+                        <button className="scada-btn" style={{ fontSize: 10, padding: "2px 8px", background: "#10b981" }} type="button" onClick={() => handleDecide(a.id, "approved")}>✅ 批准</button>
+                        <button className="scada-btn" style={{ fontSize: 10, padding: "2px 8px", background: "#ef4444" }} type="button" onClick={() => handleDecide(a.id, "rejected")}>❌ 驳回</button>
+                      </div>
+                    )}
+                    {a.decided_by && <span style={{ fontSize: 10, color: "#94a3b8" }}>审批人: {a.decided_by}</span>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
   );
 }
 
-function StatusBadge({ label, tone }: { label: string; tone: "success" | "warning" | "danger" }) {
-  return <span className={`status-badge ${tone}`}>{label}</span>;
-}
+function AuditLogSection() {
+  const [logs, setLogs] = useState<any[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [search, setSearch] = useState("");
+  const [filterAction, setFilterAction] = useState("");
+  const [page, setPage] = useState(0);
+  const pageSize = 30;
 
-function PriorityBadge({ priority }: { priority: string }) {
-  const tone = priority === "P0" ? "danger" : priority === "P1" ? "warning" : "success";
-  return <span className={`status-badge ${tone}`}>{priority}</span>;
-}
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    const resp = await fetchAuditLogs({
+      search: search || undefined,
+      action: filterAction || undefined,
+      limit: pageSize,
+      offset: page * pageSize,
+    });
+    if (resp) { setLogs(resp.items || []); setTotal(resp.total); }
+    setLoading(false);
+  }, [search, filterAction, page]);
 
-function moduleLabel(module: string): string {
-  if (module === "short_term") return "短期记忆";
-  if (module === "long_term") return "长期记忆";
-  if (module === "warning_experience") return "预警经验";
-  return module || "未知";
-}
+  useEffect(() => { loadData(); }, [loadData]);
 
-function formatBytes(value?: number | null): string {
-  if (value === undefined || value === null || Number.isNaN(value)) return "—";
-  if (value < 1024) return `${value} B`;
-  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
-  return `${(value / 1024 / 1024).toFixed(1)} MB`;
-}
+  const actionColors: Record<string, string> = {
+    import: "#3b82f6", batch_assess: "#f59e0b", assess_enterprise: "#f97316",
+    migrate: "#8b5cf6", create_approval: "#6366f1", decide_approval: "#10b981",
+  };
 
-function formatNumber(value?: number | null): string {
-  if (value === undefined || value === null || Number.isNaN(value)) return "—";
-  return value.toFixed(3);
+  return (
+    <div>
+      <div className="scada-card" style={{ marginBottom: 14 }}>
+        <div className="risk-report-header">
+          <div className="risk-report-title">🔍 审计日志</div>
+          <span className="tag tag-blue">总计: {total} 条</span>
+        </div>
+        <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
+          <input className="scada-input" placeholder="搜索日志..." value={search} onChange={(e) => { setSearch(e.target.value); setPage(0); }} style={{ width: 200 }} />
+          <select className="scada-input" value={filterAction} onChange={(e) => { setFilterAction(e.target.value); setPage(0); }} style={{ width: 140 }}>
+            <option value="">全部操作</option>
+            <option value="import">数据导入</option>
+            <option value="batch_assess">批量评估</option>
+            <option value="assess_enterprise">企业评估</option>
+            <option value="migrate">记忆迁移</option>
+            <option value="create_approval">创建审批</option>
+            <option value="decide_approval">审批决策</option>
+          </select>
+          <button className="scada-btn secondary" type="button" onClick={loadData}>🔍 搜索</button>
+        </div>
+      </div>
+
+      <div className="scada-card">
+        {logs.length === 0 ? (
+          <div className="empty-state"><div className="empty-state-icon">🔍</div><div>暂无审计日志</div></div>
+        ) : (
+          <table className="scada-table">
+            <thead><tr><th>时间</th><th>操作</th><th>操作人</th><th>目标</th><th>详情</th></tr></thead>
+            <tbody>
+              {logs.map((log) => (
+                <tr key={log.id}>
+                  <td style={{ fontSize: 11, color: "#94a3b8", whiteSpace: "nowrap" }}>{log.time}</td>
+                  <td><span className="tag" style={{ background: `${actionColors[log.action] || "#64748b"}22`, color: actionColors[log.action] || "#64748b", fontWeight: 600, fontSize: 10 }}>{log.action}</span></td>
+                  <td style={{ fontSize: 12 }}>{log.actor}</td>
+                  <td style={{ fontSize: 12 }}>{log.target}</td>
+                  <td style={{ fontSize: 12, maxWidth: 300, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{log.detail}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+        {total > pageSize && (
+          <div style={{ display: "flex", justifyContent: "center", gap: 8, marginTop: 12 }}>
+            <button className="scada-btn secondary" type="button" disabled={page === 0} onClick={() => setPage(page - 1)}>上一页</button>
+            <span style={{ color: "#94a3b8", lineHeight: "32px" }}>第 {page + 1} 页 / 共 {Math.ceil(total / pageSize)} 页</span>
+            <button className="scada-btn secondary" type="button" disabled={(page + 1) * pageSize >= total} onClick={() => setPage(page + 1)}>下一页</button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
