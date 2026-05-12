@@ -13,11 +13,19 @@ tmp_pytest/
 .env
 .env.*
 !.env.example
+.venv/
 
 # Runtime data
 *.log
 logs/*.log
 data/*.db
+data/approval_store.json
+data/audit_log.json
+data/enterprise_risk_history.json
+data/iteration_history.json
+data/long_term.json
+data/short_term.json
+data/warning_experience.json
 data/chroma_db/
 data/snapshots/
 data/uploads/
