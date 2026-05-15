@@ -5,14 +5,15 @@ FastAPI 主应用
 
 import os
 from contextlib import asynccontextmanager
-from typing import Any, Dict, List, Optional
+from typing import List
 
-from fastapi import FastAPI, File, HTTPException, Query, UploadFile
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
 
+from api.exception_handlers import register_exception_handlers
 from api.routers import audit, data, iteration, knowledge, memory, prediction
 from api.routers.prediction import agent_router
+from api.schemas.common import HealthPayload
 from utils.config import get_config
 from utils.logger import get_logger
 
@@ -64,11 +65,14 @@ def create_app() -> FastAPI:
     app.include_router(agent_router, prefix="/api/v1/agent", tags=["决策智能体"])
     app.include_router(iteration.router, prefix="/api/v1/iteration", tags=["模型迭代"])
     app.include_router(memory.router, prefix="/api/v1/memory", tags=["记忆库管理"])
-    
-    @app.get("/health")
-    async def health_check() -> Dict[str, str]:
-        return {"status": "healthy", "version": config.project.version}
-    
+
+    register_exception_handlers(app)
+
+    @app.get("/health", response_model=HealthPayload)
+    async def health_check() -> HealthPayload:
+        """健康检查端点。"""
+        return HealthPayload(status="healthy", version=config.project.version)
+
     return app
 
 

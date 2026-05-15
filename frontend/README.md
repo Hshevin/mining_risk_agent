@@ -17,7 +17,11 @@ frontend/
 ├── src/
 │   ├── main.tsx
 │   ├── App.tsx
-│   ├── api/                 # API 客户端、类型声明、SSE 流式解析
+│   ├── api/                 # API 分层（详见主 README §12.3）
+│   │   ├── http.ts          # 传输层：URL、Admin Token、JSON 解析
+│   │   ├── client.ts        # 领域 API 封装、SSE 流式解析
+│   │   ├── types.ts         # 业务类型
+│   │   └── types/common.ts  # ApiResponse 等通用契约（与后端 schemas 对齐）
 │   ├── components/          # SCADA 通用组件、ECharts 图表
 │   ├── data/demoData.ts     # 演示企业 / Mock 决策（与后端 demo_data.py 一致）
 │   ├── pages/               # 4 个 Tab 页面
@@ -57,3 +61,14 @@ docker compose up --build
 
 - 浏览器访问 `http://localhost:8501`
 - 后端 Swagger：`http://localhost:8501/docs` 或 `http://localhost:8000/docs`
+
+## 前端 API 分层
+
+与主项目 `README.md` 第十二章「软件架构与项目结构」对应：
+
+| 层级 | 文件 | 职责 |
+|------|------|------|
+| 页面/组件 | `src/pages/`、`src/components/` | UI 与交互 |
+| 领域 API | `src/api/client.ts` | 预测、知识库、记忆、迭代等业务调用 |
+| 传输层 | `src/api/http.ts` | `buildUrl`、`adminHeaders`、`parseJsonOrThrow` |
+| 契约类型 | `src/api/types.ts`、`types/common.ts` | 与后端 `api/schemas/` 对齐的 TypeScript 类型 |

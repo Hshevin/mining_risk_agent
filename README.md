@@ -42,7 +42,7 @@ open http://localhost:8501
 - [九、GLM-5 决策智能体 Workflow](#九glm-5-决策智能体-workflowstep-6)
 - [十、模型自动迭代与 CI/CD](#十模型自动迭代与-cicd-工程化step-7)
 - [十一、特征工程](#十一特征工程)
-- [十二、项目结构](#十二项目结构)
+- [十二、软件架构与项目结构](#十二软件架构与项目结构)
 - [十三、前端演示指南](#十三前端演示指南)
 - [十四、检查点验证](#十四检查点验证)
 - [十五、运行测试](#十五运行测试)
@@ -201,11 +201,7 @@ python -c "from iteration.monitor import ModelMonitor; ModelMonitor().should_ret
 
 ```bash
 cd mining_risk_agent
-<<<<<<< HEAD
 cp .env.example .env       # 可选：设置 LLM_PROVIDER、LLM API Key、MRA_ADMIN_TOKEN 等
-=======
-cp .env.example .env       # 可选：填入 GLM5_API_KEY / OPENAI_API_KEY
->>>>>>> e7cc200 (some changes)
 docker compose up -d --build
 ```
 
@@ -218,11 +214,7 @@ docker compose up -d --build
 **Docker 服务说明：**
 | 服务 | 镜像 | 容器名 | 端口映射 | 说明 |
 |------|------|--------|----------|------|
-<<<<<<< HEAD
 | api | `mining-risk-agent-api` | `mining_risk_api` | `127.0.0.1:8000:8000` | FastAPI + Uvicorn（Python 3.10-slim，仅本机直连） |
-=======
-| api | `mining-risk-agent-api` | `mining_risk_api` | `8000:8000` | FastAPI + Uvicorn（Python 3.10-slim） |
->>>>>>> e7cc200 (some changes)
 | frontend | `mining-risk-agent-frontend` | `mining_risk_frontend` | `8501:80` | React/Vite SPA（多阶段：node:20-alpine 构建 → nginx:alpine 托管 + 反向代理 `/api`、`/health`、`/docs` 至 `api`） |
 
 > **架构提示**：前端容器内 Nginx 监听 80 端口，把 `/api/*`、`/health`、`/docs`、`/redoc`、`/openapi.json` 反向代理至 `http://api:8000`，并关闭 `proxy_buffering` 以保留 SSE 流式节点输出；浏览器只与前端同源通信，从而避免 CORS 与跨域 Cookie 问题。详见 `mining_risk_agent/frontend/nginx.conf`。
@@ -934,16 +926,188 @@ cd.rollback("v2")
 | 按企业聚合 | 隐患加权、文书加权（立案权重 3 > 检查权重 1） | `EnterpriseAggregator` |
 | 数据可信度系数 | 检查来源映射：执法/专项检查 4 > 整改复查/立案 3 > 日常检查 2 > 企业自报 1 | `DataCredibilityTransformer` |
 
-## 十二、项目结构
+## 十二、软件架构与项目结构
+
+### 12.1 架构设计目标
+
+本次重构以降低模块耦合、统一前后端接口契约为目标，在**保持现有 API 路径与响应行为不变**的前提下，引入清晰的分层边界与依赖注入机制。
+
+### 12.2 后端分层架构
+
+```
+HTTP 请求
+    ↓
+Router（api/routers/*）          ← 仅负责 HTTP 绑定、参数校验、依赖注入
+    ↓ Depends
+Service（api/services/*）        ← 业务编排、异常转换、Mock 降级策略
+    ↓ 调用
+Interface / Protocol（api/interfaces/*）  ← 抽象边界，便于测试替换
+    ↓ 实现
+Harness / Model / Data 层        ← 领域能力（记忆、知识库、模型推理等）
+```
+
+| 层级 | 目录 | 职责 |
+|------|------|------|
+| 契约层 | `api/schemas/` | 统一请求/响应 DTO（Pydantic），前后端类型对齐 |
+| 接口层 | `api/interfaces/` | `Protocol` 定义 `RiskPredictor`、`FeaturePipeline`、`KnowledgeRepository` 等抽象 |
+| 服务层 | `api/services/` | `PredictionService`、`KnowledgeService`；`ResourceRegistry` 懒加载单例 |
+| 路由层 | `api/routers/` | 瘦路由，通过 `Depends(get_prediction_service)` 注入服务 |
+| 异常处理 | `api/exception_handlers.py` | `MiningRiskAgentException` → 统一 `ApiResponse` 错误信封 |
+
+**依赖注入示例：**
+
+```python
+# api/routers/prediction.py — Router 仅做 HTTP 绑定
+@agent_router.post("/decision", response_model=DecisionResponse)
+async def decision(
+    request: DecisionRequest,
+    service: PredictionService = Depends(get_prediction_service),
+) -> DecisionResponse:
+    return await service.run_decision(request)
+```
+
+**资源注册表（`api/services/dependencies.py`）：**
+
+- `ResourceRegistry` 集中管理模型、特征流水线、决策工作流等重量级单例
+- 消除 Router 内散落的全局 `_model`、`_workflow` 变量
+- 支持按场景缓存 `DecisionWorkflow` 实例
+
+### 12.3 前端分层架构
+
+```
+Pages / Components（src/pages/、src/components/）
+    ↓
+api/client.ts                    ← 领域 API 函数（预测、知识库、记忆、迭代等）
+    ↓
+api/http.ts                      ← 传输层：URL 拼接、Admin Token、JSON 解析
+    ↓
+api/types.ts + api/types/common.ts  ← 与后端 schemas 对齐的 TypeScript 类型
+```
+
+| 文件 | 职责 |
+|------|------|
+| `api/http.ts` | `buildUrl`、`adminHeaders`、`parseJsonOrThrow`、`getJson`、`postJson` |
+| `api/types/common.ts` | `ApiResponse<T>`、`ApiErrorBody`、`PaginatedData<T>`、`HealthPayload` |
+| `api/client.ts` | 各业务域 API 封装，SSE 流式决策解析 |
+| `api/types.ts` | 业务领域类型（`DecisionResponse`、`ScenarioId` 等） |
+
+### 12.4 统一接口契约
+
+#### 通用响应信封（新接口推荐）
+
+后端 `api/schemas/common.py` 与前端 `api/types/common.ts` 对齐：
+
+```json
+{
+  "success": true,
+  "data": { ... },
+  "message": ""
+}
+```
+
+失败时：
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "请求参数校验失败",
+    "field": "enterprise_id"
+  }
+}
+```
+
+> **兼容性说明**：历史接口（如 `/api/v1/prediction/predict`、`/api/v1/agent/decision`）仍直接返回业务 `data` 模型，不强制包裹信封，避免破坏现有前端。新接口应优先采用 `ApiResponse<T>`。
+
+#### Schema 模块划分
+
+| 模块 | 文件 | 主要模型 |
+|------|------|----------|
+| 通用 | `api/schemas/common.py` | `ApiResponse`、`ErrorDetail`、`PaginatedResponse`、`HealthPayload` |
+| 预测/决策 | `api/schemas/prediction.py` | `PredictRequest`、`DecisionRequest`、`DecisionResponse`、`LLMConfigResponse` |
+| 知识库 | `api/schemas/knowledge.py` | `KnowledgeUpdateRequest`、`KnowledgeMutationResponse` |
+| 数据 | `api/schemas/data.py` | `DataUploadResponse`、`BatchUploadRequest` |
+| 审计 | `api/schemas/audit.py` | `AuditLogRequest`、`AuditLogEntry` |
+
+#### Protocol 抽象接口
+
+`api/interfaces/prediction.py` 定义以下 Protocol，服务层通过接口调用底层实现：
+
+| Protocol | 说明 |
+|----------|------|
+| `RiskPredictor` | 风险预测模型：`predict()`、`load()` |
+| `FeaturePipeline` | 特征工程流水线：`transform()`、`load()` |
+| `DecisionWorkflowPort` | 决策工作流：`run_async()` |
+| `KnowledgeRepository` | 知识库持久化：`read()`、`write()`、`snapshot()`、`rollback()` |
+| `DecisionStreamPort` | SSE 流式决策输出 |
+
+### 12.5 注释与类型规范
+
+- **后端**：公共函数、类、方法均补充中文 docstring，说明功能、参数、返回值、异常；Pydantic 模型字段使用 `Field(description=...)` 标注
+- **前端**：`api/http.ts`、`api/types/common.ts` 使用 JSDoc 注释；业务类型集中在 `api/types.ts`
+- **业务异常**：`utils/exceptions.py` 各类继承 `MiningRiskAgentException`，由 `exception_handlers.py` 统一映射
+
+### 12.6 重构变更摘要
+
+**新建文件（14 个）：**
+
+| 路径 | 说明 |
+|------|------|
+| `api/schemas/__init__.py` 及 `common.py`、`prediction.py`、`knowledge.py`、`data.py`、`audit.py` | 统一 DTO |
+| `api/interfaces/__init__.py`、`prediction.py` | Protocol 抽象 |
+| `api/services/__init__.py`、`dependencies.py`、`prediction_service.py`、`knowledge_service.py` | 服务层与 DI |
+| `api/exception_handlers.py` | 全局异常处理 |
+| `frontend/src/api/http.ts` | HTTP 传输层 |
+| `frontend/src/api/types/common.ts` | 通用 API 类型 |
+
+**主要修改：**
+
+| 文件 | 变更 |
+|------|------|
+| `api/routers/prediction.py` | 从 ~700 行瘦身至 ~100 行，业务逻辑迁入 `PredictionService` |
+| `api/routers/knowledge.py` | 请求模型改从 `api/schemas/knowledge` 导入，保留 RAG/概览端点 |
+| `api/routers/data.py`、`audit.py` | 使用统一 Schema |
+| `api/main.py` | 注册异常处理器，`/health` 使用 `HealthPayload` |
+| `utils/exceptions.py` | 补充各类异常中文说明 |
+| `frontend/src/api/client.ts` | 改用 `http.ts` 传输层 |
+| `frontend/src/api/types.ts` | 复用 `HealthPayload` 与通用类型导出 |
+
+### 12.7 后续演进建议
+
+| 优先级 | 模块 | 建议 |
+|--------|------|------|
+| 高 | `api/routers/memory.py` | 拆分为 `MemoryRepository` + `MemoryService`，消除 Router 内大量业务逻辑 |
+| 高 | `api/routers/iteration.py` | 抽取 `IterationService`，状态机与训练流水线解耦 |
+| 中 | 知识库 Router | 将 `_build_knowledge_system_payload` 等辅助函数迁入 `knowledge_service.py` |
+| 中 | 新接口规范 | 逐步采用 `ApiResponse<T>` 信封；历史接口保持直连 `data` 兼容 |
+| 低 | `*_1.py` 清理 | 确认无引用后删除历史备份文件 |
+
+### 12.8 项目目录结构
 
 ```
 mining_risk_agent/
 ├── api/                  # FastAPI 接口层
-│   ├── main.py
+│   ├── main.py           # 应用入口、路由注册、异常处理器
+│   ├── exception_handlers.py
+│   ├── schemas/          # 统一 DTO / API 契约（新增）
+│   │   ├── common.py     # ApiResponse、ErrorDetail、HealthPayload
+│   │   ├── prediction.py # 预测/决策/LLM/场景切换
+│   │   ├── knowledge.py
+│   │   ├── data.py
+│   │   └── audit.py
+│   ├── interfaces/       # Protocol 抽象边界（新增）
+│   │   └── prediction.py # RiskPredictor、FeaturePipeline 等
+│   ├── services/         # 业务服务层 + 依赖注入（新增）
+│   │   ├── dependencies.py   # ResourceRegistry 单例工厂
+│   │   ├── prediction_service.py
+│   │   └── knowledge_service.py
 │   └── routers/
 │       ├── data.py
-│       ├── prediction.py   # 风险预测 + 决策智能体 Workflow 路由
+│       ├── prediction.py   # 瘦路由：风险预测 + 决策智能体 Workflow
 │       ├── knowledge.py
+│       ├── memory.py
+│       ├── iteration.py
 │       └── audit.py
 ├── agent/                # LangGraph 决策工作流（Step 6）
 │   ├── __init__.py
@@ -997,7 +1161,11 @@ mining_risk_agent/
 │   ├── src/
 │   │   ├── main.tsx
 │   │   ├── App.tsx
-│   │   ├── api/          # API 客户端、TS 类型、POST SSE 解析
+│   │   ├── api/          # API 分层：http 传输层 + client 领域函数 + types 契约
+│   │   │   ├── http.ts           # URL、Admin Token、JSON 解析（新增）
+│   │   │   ├── client.ts         # 领域 API 封装
+│   │   │   ├── types.ts          # 业务类型
+│   │   │   └── types/common.ts   # ApiResponse 等通用类型（新增）
 │   │   ├── components/   # SCADA 通用组件（StatusBar/Sidebar/Tabs/ScadaCard 等）
 │   │   ├── pages/        # 4 个 Tab 页面
 │   │   ├── data/         # demoData.ts（与后端 demo_data.py 同步）
@@ -1039,11 +1207,7 @@ mining_risk_agent/
 │   ├── 风险事件归档.md
 │   ├── 处置经验归档.md
 │   └── 系统日志归档.md
-<<<<<<< HEAD
 ├── config.yaml           # 全局配置（含 llm.provider / llm.providers + scenarios 配置节）
-=======
-├── config.yaml           # 全局配置（含 llm.glm5 + scenarios 配置节）
->>>>>>> e7cc200 (some changes)
 ├── requirements.txt      # 后端 API 精简运行时依赖（Docker 默认）
 ├── requirements-api.txt  # requirements.txt 的别名，便于 CI/文档引用
 ├── requirements-ml.txt   # 训练 / SHAP / XGBoost / LightGBM / CatBoost / TensorFlow
@@ -1116,7 +1280,7 @@ assets/
 
 当后端服务或 GLM-5 API 不可用时，系统会自动启用 **两级降级**：
 
-1. **后端 Mock**：`api/routers/prediction.py` 中 `_generate_mock_decision()` 根据当前场景返回差异化 Mock 数据（仍走 HTTP 200，并附 `mock=true`）
+1. **后端 Mock**：`api/services/prediction_service.py` 中 `_generate_mock_decision()` 根据当前场景返回差异化 Mock 数据（仍走 HTTP 200，并附 `mock=true`）
 2. **前端本地 Mock**：`frontend/src/data/demoData.ts` 中 `generateMockDecision(scenarioId)` 提供与后端格式完全一致的兜底 JSON；后端不可达时由前端 `RiskPredictionPage` 直接调用，路演不中断
 
 **仅启动前端（无后端模式）**：
@@ -1146,6 +1310,7 @@ npm run dev
 | ECharts 5 | 数据可视化 | `ProbabilityChart` 环形概率分布、`ShapChart` SHAP Top5 水平条形图，全部走 `echarts-for-react` |
 | 自定义 SCADA CSS | 投影级样式 | `src/styles/scada.css` 内置 SCADA 暗色主题、`risk-red-pulse` 脉冲动画、`glow-red/orange/yellow/blue` 风险光晕、Timeline / Validation / Memory 卡片样式 |
 | `fetch + ReadableStream` | POST SSE 流式节点 | `api/client.ts:streamDecision` 自行解析 `data:` 行，弥补 `EventSource` 不支持 POST 的限制 |
+| `api/http.ts` 传输层 | 统一 HTTP 调用 | `buildUrl`、`adminHeaders`、`parseJsonOrThrow` 与后端 `ApiResponse` 错误格式对齐 |
 | 本地 Mock 兜底 | 后端离线降级 | `src/data/demoData.ts` 镜像后端 `frontend/demo_data.py` 的三场景 Mock 决策；`/api/v1/agent/decision` 失败时由前端直接渲染本地 Mock |
 | Nginx 反向代理 | 同源避免跨域 | 前端容器内 Nginx 把 `/api`、`/health`、`/docs` 转发到 `api:8000`，并关闭 `proxy_buffering` 以保留 SSE 流 |
 

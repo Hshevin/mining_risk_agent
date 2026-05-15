@@ -1,8 +1,10 @@
+import type { HealthPayload } from "./types/common";
+
+export type { ApiErrorBody, ApiResponse, PaginatedData, PaginatedResponse } from "./types/common";
+
 export type ScenarioId = "chemical" | "metallurgy" | "dust";
 
-export interface HealthResponse {
-  status: string;
-  version?: string;
+export interface HealthResponse extends HealthPayload {
   detail?: string;
 }
 

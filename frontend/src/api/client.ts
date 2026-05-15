@@ -23,30 +23,14 @@ import type {
   ShortTermMemory,
   WarningLog,
 } from "./types";
+import {
+  adminHeaders,
+  apiBaseLabel,
+  buildUrl,
+  parseJsonOrThrow as jsonOrThrow,
+} from "./http";
 
-const RAW_BASE = (import.meta.env.VITE_API_BASE as string | undefined) ?? "";
-// 去掉末尾斜杠以保证拼接稳定
-const API_BASE = RAW_BASE.replace(/\/$/, "");
-const ADMIN_TOKEN = (import.meta.env.VITE_ADMIN_API_TOKEN as string | undefined) ?? "";
-
-function url(path: string): string {
-  if (path.startsWith("http")) return path;
-  return `${API_BASE}${path}`;
-}
-
-function adminHeaders(extra?: HeadersInit): HeadersInit {
-  return ADMIN_TOKEN
-    ? { ...extra, "X-Admin-Token": ADMIN_TOKEN }
-    : { ...extra };
-}
-
-async function jsonOrThrow<T>(resp: Response): Promise<T> {
-  if (!resp.ok) {
-    const text = await resp.text().catch(() => "");
-    throw new Error(`HTTP ${resp.status} ${resp.statusText} ${text}`);
-  }
-  return (await resp.json()) as T;
-}
+const url = buildUrl;
 
 export async function fetchHealth(): Promise<HealthResponse> {
   try {
@@ -916,4 +900,4 @@ export async function promoteIteration(
   }
 }
 
-export const apiBase = API_BASE || "(同源)";
+export const apiBase = apiBaseLabel;
