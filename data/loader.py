@@ -2,16 +2,17 @@
 数据加载器模块：自动解压并加载 CSV/Excel/JSON 格式的企业数据，支持批量导入和 API 实时数据接入
 """
 
+import csv
 import json
 import os
 import zipfile
 from pathlib import Path
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional, Sequence, Union
 
 import pandas as pd
 from pydantic import BaseModel, Field, field_validator
 
-from utils.config import get_config
+from utils.config import get_config, resolve_project_path
 from utils.exceptions import DataLoadingError
 from utils.logger import get_logger
 
@@ -47,11 +48,178 @@ class DataLoader:
 
     def __init__(self, raw_data_path: Optional[str] = None):
         config = get_config()
-        self.raw_data_path = raw_data_path or config.data.raw_data_path
-        self.reference_data_path = config.data.reference_data_path
+        self.raw_data_path = str(
+            self._resolve_existing_path(raw_data_path)
+            if raw_data_path is not None
+            else self._resolve_path(config.data.raw_data_path)
+        )
+        self.reference_data_path = str(self._resolve_path(config.data.reference_data_path))
+        self.merged_data_path = (
+            str(self._resolve_path(config.data.merged_data_path))
+            if config.data.merged_data_path
+            else None
+        )
+        self.public_data_root = (
+            str(self._resolve_path(config.data.public_data_root))
+            if config.data.public_data_root
+            else None
+        )
+        self.all_public_data_paths = [
+            str(self._resolve_path(path))
+            for path in (config.data.all_public_data_paths or [])
+        ]
         self.encoding = config.data.encoding
         self.supported_formats = config.data.supported_formats
+        self.supported_suffixes = self._supported_suffixes(self.supported_formats)
+        self.csv_encoding_fallbacks = self._unique_encodings(
+            [self.encoding, *config.data.csv_encoding_fallbacks, "utf-8", "gb18030", "gbk"]
+        )
         self._cache: Dict[str, pd.DataFrame] = {}
+
+    @staticmethod
+    def _resolve_path(path: Union[str, Path]) -> Path:
+        """Resolve configured relative paths from the project root."""
+        return resolve_project_path(path)
+
+    @staticmethod
+    def _resolve_existing_path(path: Union[str, Path]) -> Path:
+        path_obj = Path(path)
+        if path_obj.exists() or path_obj.is_absolute():
+            return path_obj.resolve()
+        return resolve_project_path(path_obj)
+
+    @staticmethod
+    def _supported_suffixes(formats: Sequence[str]) -> set[str]:
+        suffixes: set[str] = set()
+        for fmt in formats:
+            normalized = fmt.lower().lstrip(".")
+            if normalized == "excel":
+                suffixes.update({".xlsx", ".xls"})
+            elif normalized in {"csv", "xlsx", "xls", "json"}:
+                suffixes.add(f".{normalized}")
+        return suffixes
+
+    @staticmethod
+    def _unique_encodings(encodings: Sequence[str]) -> List[str]:
+        unique: List[str] = []
+        for encoding in encodings:
+            if encoding and encoding not in unique:
+                unique.append(encoding)
+        return unique
+
+    @staticmethod
+    def _clean_column_name(column: object, index: int) -> str:
+        name = "" if column is None else str(column)
+        name = name.replace("\ufeff", "").strip()
+        return name or f"Unnamed: {index}"
+
+    def _deduplicate_columns(self, columns: Sequence[object], source: str = "") -> List[str]:
+        counts: Dict[str, int] = {}
+        deduplicated: List[str] = []
+        renamed: List[str] = []
+
+        for index, column in enumerate(columns):
+            base_name = self._clean_column_name(column, index)
+            count = counts.get(base_name, 0) + 1
+            counts[base_name] = count
+
+            if count == 1:
+                deduplicated.append(base_name)
+                continue
+
+            new_name = f"{base_name}__dup{count}"
+            deduplicated.append(new_name)
+            renamed.append(f"{base_name} -> {new_name}")
+
+        if renamed:
+            location = f" in {source}" if source else ""
+            logger.warning("重复字段已追加 __dupN 后缀%s: %s", location, "; ".join(renamed))
+
+        return deduplicated
+
+    def _read_csv_header(self, file_path: Path, encoding: str, kwargs: Dict) -> Optional[List[str]]:
+        header = kwargs.get("header", "infer")
+        if kwargs.get("names") is not None or header not in ("infer", 0):
+            return None
+
+        delimiter = kwargs.get("delimiter", kwargs.get("sep", ","))
+        if delimiter is None:
+            delimiter = ","
+        if not isinstance(delimiter, str) or len(delimiter) != 1:
+            return None
+
+        with file_path.open("r", encoding=encoding, newline="") as handle:
+            reader = csv.reader(handle, delimiter=delimiter)
+            try:
+                return next(reader)
+            except StopIteration:
+                return []
+
+    def _read_csv_with_fallback(self, file_path: Path, **kwargs) -> pd.DataFrame:
+        read_kwargs = dict(kwargs)
+        requested_encoding = read_kwargs.pop("encoding", None) or self.encoding
+        encodings = self._unique_encodings(
+            [requested_encoding, *self.csv_encoding_fallbacks]
+        )
+        last_error: Optional[Exception] = None
+
+        for encoding in encodings:
+            try:
+                csv_kwargs = dict(read_kwargs)
+                raw_columns = self._read_csv_header(file_path, encoding, csv_kwargs)
+                if raw_columns is not None:
+                    csv_kwargs["header"] = 0
+                    csv_kwargs["names"] = self._deduplicate_columns(raw_columns, str(file_path))
+
+                df = pd.read_csv(file_path, encoding=encoding, **csv_kwargs)
+                if raw_columns is None:
+                    df.columns = self._deduplicate_columns(list(df.columns), str(file_path))
+
+                if encoding != requested_encoding:
+                    logger.warning(
+                        "CSV 文件 %s 使用备用编码 %s 读取（首选编码 %s 失败）",
+                        file_path,
+                        encoding,
+                        requested_encoding,
+                    )
+                return df
+            except (UnicodeDecodeError, pd.errors.ParserError, LookupError) as exc:
+                last_error = exc
+                continue
+            except Exception as exc:
+                last_error = exc
+                break
+
+        raise DataLoadingError(f"CSV 文件无法读取 {file_path}: {last_error}")
+
+    @staticmethod
+    def _drop_unsupported_kwargs(ext: str, kwargs: Dict) -> Dict:
+        cleaned = dict(kwargs)
+        if ext in {".xlsx", ".xls", ".json"}:
+            cleaned.pop("low_memory", None)
+        return cleaned
+
+    def _iter_data_files(self, directory: Path, pattern: str = "*") -> List[Path]:
+        return sorted(
+            path
+            for path in directory.rglob(pattern)
+            if path.is_file() and path.suffix.lower() in self.supported_suffixes
+        )
+
+    @staticmethod
+    def _result_key(file_path: Path, root: Path, existing: Dict[str, pd.DataFrame]) -> str:
+        try:
+            key = file_path.relative_to(root).with_suffix("").as_posix()
+        except ValueError:
+            key = file_path.stem
+
+        if key not in existing:
+            return key
+
+        index = 2
+        while f"{key}__{index}" in existing:
+            index += 1
+        return f"{key}__{index}"
 
     def auto_unzip(self, zip_path: str, extract_to: Optional[str] = None) -> str:
         """
@@ -81,7 +249,7 @@ class DataLoader:
         except Exception as e:
             raise DataLoadingError(f"解压失败: {e}")
 
-    def load_file(self, file_path: str, **kwargs) -> pd.DataFrame:
+    def load_file(self, file_path: Union[str, Path], **kwargs) -> pd.DataFrame:
         """
         加载单个数据文件
         
@@ -92,27 +260,44 @@ class DataLoader:
         Returns:
             DataFrame
         """
-        if not os.path.exists(file_path):
-            raise DataLoadingError(f"文件不存在: {file_path}")
-        
-        ext = Path(file_path).suffix.lower()
+        resolved_path = self._resolve_existing_path(file_path)
+        if not resolved_path.exists():
+            raise DataLoadingError(f"文件不存在: {resolved_path}")
+
+        ext = resolved_path.suffix.lower()
+        read_kwargs = self._drop_unsupported_kwargs(ext, kwargs)
         
         try:
             if ext == ".csv":
-                df = pd.read_csv(file_path, encoding=self.encoding, **kwargs)
+                df = self._read_csv_with_fallback(resolved_path, **read_kwargs)
             elif ext in (".xlsx", ".xls"):
-                df = pd.read_excel(file_path, **kwargs)
+                df = pd.read_excel(resolved_path, **read_kwargs)
+                df.columns = self._deduplicate_columns(list(df.columns), str(resolved_path))
             elif ext == ".json":
-                df = pd.read_json(file_path, **kwargs)
+                df = pd.read_json(resolved_path, **read_kwargs)
+                if hasattr(df, "columns"):
+                    df.columns = self._deduplicate_columns(list(df.columns), str(resolved_path))
             else:
                 raise DataLoadingError(f"不支持的文件格式: {ext}")
             
-            logger.info(f"成功加载 {file_path}，形状: {df.shape}")
+            logger.info(f"成功加载 {resolved_path}，形状: {df.shape}")
             return df
+        except DataLoadingError:
+            raise
         except Exception as e:
-            raise DataLoadingError(f"加载文件失败 {file_path}: {e}")
+            if ext in (".xlsx", ".xls"):
+                raise DataLoadingError(
+                    f"Excel 文件无法读取，可能文件头损坏或格式与扩展名不匹配: {resolved_path}: {e}"
+                )
+            raise DataLoadingError(f"加载文件失败 {resolved_path}: {e}")
 
-    def load_directory(self, directory: Optional[str] = None, pattern: str = "*") -> Dict[str, pd.DataFrame]:
+    def load_directory(
+        self,
+        directory: Optional[Union[str, Path]] = None,
+        pattern: str = "*",
+        skip_errors: bool = True,
+        **kwargs,
+    ) -> Dict[str, pd.DataFrame]:
         """
         批量加载目录下的所有支持格式文件
         
@@ -123,29 +308,59 @@ class DataLoader:
         Returns:
             文件名 -> DataFrame 的字典
         """
-        directory = directory or self.raw_data_path
-        if not os.path.exists(directory):
-            raise DataLoadingError(f"目录不存在: {directory}")
+        directory_path = self._resolve_existing_path(directory or self.raw_data_path)
+        if not directory_path.exists():
+            raise DataLoadingError(f"目录不存在: {directory_path}")
         
         results: Dict[str, pd.DataFrame] = {}
-        path_obj = Path(directory)
+
+        for file_path in self._iter_data_files(directory_path, pattern):
+            key = self._result_key(file_path, directory_path, results)
+            try:
+                results[key] = self.load_file(file_path, **kwargs)
+            except DataLoadingError as e:
+                if not skip_errors:
+                    raise
+                logger.warning("跳过无法读取的数据文件 %s: %s", file_path, e)
         
-        for ext in self.supported_formats:
-            if ext == "excel":
-                globs = ["*.xlsx", "*.xls"]
-            else:
-                globs = [f"*.{ext}"]
-            
-            for glob_pattern in globs:
-                for file_path in path_obj.rglob(glob_pattern):
-                    key = file_path.stem
-                    try:
-                        df = self.load_file(str(file_path))
-                        results[key] = df
-                    except DataLoadingError as e:
-                        logger.warning(f"跳过文件 {file_path}: {e}")
-        
-        logger.info(f"目录 {directory} 共加载 {len(results)} 个文件")
+        logger.info(f"目录 {directory_path} 共加载 {len(results)} 个文件")
+        return results
+
+    def load_public_data(
+        self,
+        paths: Optional[Sequence[Union[str, Path]]] = None,
+        pattern: str = "*",
+        skip_errors: bool = True,
+        **kwargs,
+    ) -> Dict[str, pd.DataFrame]:
+        """递归加载公开数据根目录下所有受支持的 CSV/XLSX/JSON 文件。"""
+        if paths is None:
+            target_paths = list(self.all_public_data_paths)
+        elif isinstance(paths, (str, Path)):
+            target_paths = [paths]
+        else:
+            target_paths = list(paths)
+        if not target_paths and self.public_data_root:
+            target_paths = [self.public_data_root]
+        if not target_paths:
+            raise DataLoadingError("未配置 public_data_root 或 all_public_data_paths")
+
+        results: Dict[str, pd.DataFrame] = {}
+        for target in target_paths:
+            directory_path = self._resolve_existing_path(target)
+            if not directory_path.exists():
+                raise DataLoadingError(f"公开数据目录不存在: {directory_path}")
+
+            for file_path in self._iter_data_files(directory_path, pattern):
+                key = self._result_key(file_path, directory_path, results)
+                try:
+                    results[key] = self.load_file(file_path, **kwargs)
+                except DataLoadingError as e:
+                    if not skip_errors:
+                        raise
+                    logger.warning("跳过无法读取的数据文件 %s: %s", file_path, e)
+
+        logger.info(f"公开数据扫描共加载 {len(results)} 个文件")
         return results
 
     def load_from_api(self, request: DataUploadRequest) -> pd.DataFrame:
@@ -182,15 +397,18 @@ class DataLoader:
                     df = pd.read_json(StringIO(content))
             else:
                 raise DataLoadingError(f"不支持的格式: {fmt}")
+
+            if hasattr(df, "columns"):
+                df.columns = self._deduplicate_columns(list(df.columns), f"API {fmt}")
             
             logger.info(f"API 数据加载成功，企业ID: {request.enterprise_id}, 形状: {df.shape}")
             return df
         except Exception as e:
             raise DataLoadingError(f"API 数据加载失败: {e}")
 
-    def load_merged_dataset(self) -> pd.DataFrame:
+    def load_merged_dataset(self, **kwargs) -> pd.DataFrame:
         """
-        加载预合并训练集 new_已清洗.csv（80016行×215列）
+        加载预合并训练集 new_已清洗.xlsx（80016行×214列）
 
         该文件是对数据补充目录各表的跨系统整合结果，直接用于模型训练。
         各原始表之间 ID 体系不兼容（详见 results.md §10.2），无法在代码层 join。
@@ -198,18 +416,12 @@ class DataLoader:
         Returns:
             完整训练 DataFrame，含目标列 new_level（A/B/C/D）
         """
-        config = get_config()
-        merged_path = getattr(config.data, "merged_data_path", None)
+        merged_path = self.merged_data_path
         if not merged_path:
             raise DataLoadingError("config.data.merged_data_path 未配置")
 
-        # 路径相对于当前工作目录
-        if not os.path.isabs(merged_path):
-            base = os.path.dirname(os.path.abspath(__file__))
-            merged_path = os.path.normpath(os.path.join(base, "..", merged_path))
-
         logger.info(f"加载预合并训练集: {merged_path}")
-        return self.load_file(merged_path, low_memory=False)
+        return self.load_file(merged_path, **kwargs)
 
     def merge_enterprise_tables(
         self,

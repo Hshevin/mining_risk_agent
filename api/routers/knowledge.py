@@ -114,192 +114,16 @@ def _get_kb() -> KnowledgeBaseManager:
     return KnowledgeBaseManager()
 
 
-def _verify_kb_write(kb: KnowledgeBaseManager, filename: str, expected: str) -> Dict[str, Any]:
-    actual = kb.read(filename)
-    if actual != expected:
-        raise HTTPException(status_code=500, detail=f"知识库写入校验失败: {filename}")
-    encoded = actual.encode("utf-8")
-    return {
-        "status": "success",
-        "filename": filename,
-        "path": f"knowledge_base/{filename}",
-        "size": len(encoded),
-        "checksum": hashlib.sha256(encoded).hexdigest(),
-        "verified": True,
-    }
-def _read_json(path: Path) -> Dict[str, Any]:
-    try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except FileNotFoundError:
-        return {}
-    except Exception as exc:
-        logger.warning("读取报告失败 %s: %s", path, exc)
-        return {}
+class KnowledgeUpdateRequest(BaseModel):
+    filename: str
+    content: str
+    agent_id: Optional[str] = None
 
 
-def _short_sha(value: Optional[str]) -> str:
-    if not value:
-        return ""
-    return value[:12]
-
-
-def _compact_text(text: str, limit: int = 260) -> str:
-    compact = re.sub(r"\s+", " ", text or "").strip()
-    if len(compact) <= limit:
-        return compact
-    return compact[:limit].rstrip() + "..."
-
-
-def _extract_first(patterns: List[str], text: str) -> str:
-    for pattern in patterns:
-        match = re.search(pattern, text or "")
-        if match:
-            return match.group(1)
-    return ""
-
-
-def _extract_rule_id(text: str) -> str:
-    return _extract_first([r"\b((?:COM|PHY|SRC)-[A-Z]+-\d{3})\b"], text)
-
-
-def _extract_sop_id(text: str) -> str:
-    return _extract_first([r"\b(SOP-[A-Z]+(?:-[A-Z0-9]+)*)\b"], text)
-
-
-def _extract_case_id(text: str) -> str:
-    return _extract_first(
-        [
-            r"case_id[：:]\s*`?([A-E]-\d{3})`?",
-            r"\b([A-E]-\d{3})[｜|]",
-            r"\b([A-E]-\d{3})\b",
-        ],
-        text,
-    )
-
-
-def _normalize_source_file(value: str) -> str:
-    if not value:
-        return ""
-    normalized = value.replace("\\", "/")
-    if normalized.startswith("knowledge_base/"):
-        return normalized
-    if normalized.startswith("/knowledge_base/"):
-        return normalized[1:]
-    return f"knowledge_base/{normalized}" if normalized.endswith(".md") else normalized
-
-
-def _result_to_rag_item(result: Dict[str, Any]) -> Dict[str, Any]:
-    metadata = result.get("metadata") or {}
-    text = str(result.get("text") or "")
-    distance = result.get("distance")
-    score = result.get("score") or result.get("rerank_score")
-    if score is None and distance is not None:
-        try:
-            score = max(0.0, 1.0 - float(distance))
-        except Exception:
-            score = None
-
-    return {
-        "id": result.get("id", ""),
-        "source_file": _normalize_source_file(str(metadata.get("source_file", ""))),
-        "section_title": metadata.get("section_title", ""),
-        "rule_id": metadata.get("rule_id") or _extract_rule_id(text),
-        "sop_id": metadata.get("sop_id") or _extract_sop_id(text),
-        "case_id": metadata.get("case_id") or _extract_case_id(text),
-        "doc_type": metadata.get("doc_type", ""),
-        "distance": float(distance) if distance is not None else None,
-        "score": float(score) if score is not None else None,
-        "matched_text": _compact_text(text),
-    }
-
-
-def _build_knowledge_system_payload() -> Dict[str, Any]:
-    audit = _read_json(AUDIT_REPORT_PATH)
-    rag = _read_json(RAG_REPORT_PATH)
-    agentfs = _read_json(AGENTFS_REPORT_PATH)
-    rules = _read_json(RULE_REPORT_PATH)
-    cases = _read_json(ACCIDENT_REPORT_PATH)
-
-    status_counts = audit.get("status_counts") or {"PASS": 15, "WARN": 6, "FAIL": 0}
-    after = agentfs.get("after") or {}
-    comparison = after.get("comparison") or []
-    comparison_by_name = {
-        Path(str(item.get("path", ""))).name: item for item in comparison
-    }
-    per_file_chunks = rag.get("per_source_file_chunk_count") or {}
-    source_commit = rag.get("source_commit") or agentfs.get("snapshot_commit_id")
-
-    kb_files: List[Dict[str, Any]] = []
-    for filename, defaults in KB_HIGHLIGHTS.items():
-        compare = comparison_by_name.get(filename, {})
-        chunk_count = (
-            per_file_chunks.get(f"knowledge_base/{filename}")
-            or per_file_chunks.get(filename)
-            or 0
-        )
-        kb_files.append({
-            "filename": filename,
-            "type": defaults["type"],
-            "highlight": defaults["highlight"],
-            "agentfs_match": compare.get("status") == "match",
-            "rag_chunks": int(chunk_count or 0),
-            "source_commit": source_commit,
-            "source_commit_short": _short_sha(source_commit),
-            "quality_status": "PASS",
-            "summary": defaults["summary"],
-            "key_sections": defaults["key_sections"],
-            "data_sources": defaults["data_sources"],
-            "fs_size": compare.get("fs_size"),
-            "sha256": compare.get("fs_sha256") or compare.get("agent_checksum"),
-            "updated_at": compare.get("agent_updated_at"),
-        })
-
-    deprecated_entries = after.get("extras_or_malformed") or []
-    if not deprecated_entries:
-        for result in audit.get("results", []):
-            if result.get("name") == "gap.agentfs_deprecated_malformed_path":
-                deprecated_entries = (result.get("evidence") or {}).get("deprecated_entries") or []
-                break
-
-    return {
-        "overview": {
-            "audit_status": audit.get("overall_status", "PASS_WITH_WARNINGS"),
-            "pass_count": int(status_counts.get("PASS", 15)),
-            "warn_count": int(status_counts.get("WARN", 6)),
-            "fail_count": int(status_counts.get("FAIL", 0)),
-            "kb_file_count": len(KB_HIGHLIGHTS),
-            "rag_chunks": int(rag.get("collection_count") or rag.get("chunk_count_added") or 639),
-            "real_public_data_cases": int(
-                ((cases.get("case_counts") or {}).get("real_public_data_cases")) or 36
-            ),
-            "rule_count": int(((rules.get("rule_counts") or {}).get("total")) or 65),
-            "agentfs_sync_status": "match" if after.get("all_main_files_match", True) else "diff",
-            "embedding_backend": rag.get("embedding_backend", "fallback"),
-        },
-        "knowledge_bases": kb_files,
-        "agentfs": {
-            "snapshot_commit_id": agentfs.get("snapshot_commit_id") or source_commit,
-            "snapshot_commit_short": _short_sha(agentfs.get("snapshot_commit_id") or source_commit),
-            "fs_agentfs_match": bool(after.get("all_main_files_match", True)),
-            "backup_path": (agentfs.get("backup") or {}).get("path", ""),
-            "deprecated_entries": deprecated_entries,
-            "deprecated_warning": "deprecated 乱码路径仍保留，按审计要求不在本轮删除",
-            "sync_script_name": "scripts/sync_kb_to_agentfs.py",
-            "db_path": agentfs.get("db_path", ""),
-            "agent_id": agentfs.get("agent_id", "kb_sync"),
-        },
-        "rag_index": {
-            "persist_directory": rag.get("persist_directory", "data/chroma_db"),
-            "collection_name": rag.get("collection_name", "knowledge_base"),
-            "collection_count": int(rag.get("collection_count") or 639),
-            "embedding_backend": rag.get("embedding_backend", "fallback"),
-            "fallback_embedding_used": bool(rag.get("fallback_embedding_used", True)),
-            "source_commit": source_commit,
-            "source_commit_short": _short_sha(source_commit),
-        },
-        "memory_archives": MEMORY_ARCHIVES,
-        "audit_warnings": AUDIT_WARNINGS,
-    }
+class KnowledgeAppendRequest(BaseModel):
+    filename: str
+    content: str
+    agent_id: Optional[str] = None
 
 
 @router.get("/list")
@@ -320,98 +144,26 @@ async def read_knowledge(filename: str) -> Dict[str, str]:
         raise HTTPException(status_code=404, detail=str(e))
 
 
-@router.get("/system/overview")
-async def get_knowledge_system_overview() -> Dict[str, Any]:
-    """只读返回知识底座审计、索引、AgentFS 与记忆归档摘要。"""
-    return _build_knowledge_system_payload()
-
-
-@router.get("/rag/search")
-async def search_knowledge_rag(
-    q: str = Query(..., min_length=1, description="知识库检索查询"),
-    top_k: int = Query(6, ge=1, le=12),
-) -> Dict[str, Any]:
-    """只读 RAG 检索演示：不触发知识库写入、同步或索引重建。"""
-    rag_report = _read_json(RAG_REPORT_PATH)
-    persist_directory = Path(
-        rag_report.get("persist_directory") or resolve_project_path("data/chroma_db")
-    )
-    collection_name = rag_report.get("collection_name", "knowledge_base")
-
-    items: List[Dict[str, Any]] = []
-    mode = "chroma"
-
-    if (persist_directory / "chroma.sqlite3").exists():
-        try:
-            store = VectorStore(
-                persist_directory=str(persist_directory),
-                collection_name=collection_name,
-                embedding_backend="fallback",
-            )
-            items = [_result_to_rag_item(result) for result in store.similarity_search(q, top_k=top_k)]
-        except Exception as exc:
-            logger.warning("RAG 检索失败，降级到证据检索器: %s", exc)
-            items = []
-            mode = "markdown_fallback"
-    else:
-        mode = "markdown_fallback"
-
-    if not items:
-        retriever = EvidenceRetriever(
-            persist_directory=str(persist_directory),
-            collection_name=collection_name,
-        )
-        evidence = retriever.retrieve(
-            query=q,
-            layer="knowledge_search",
-            doc_types=["conditions", "compliance", "physics", "sop", "cases", "history"],
-            top_k=top_k,
-            proposition_id="knowledge-demo",
-        )
-        for item in evidence:
-            raw = item.model_dump() if hasattr(item, "model_dump") else item.dict()
-            raw["text"] = raw.pop("matched_text", "")
-            raw["metadata"] = {
-                "source_file": raw.get("source_file", ""),
-                "section_title": raw.get("section_title", ""),
-                "rule_id": raw.get("rule_id", ""),
-                "sop_id": raw.get("sop_id", ""),
-                "case_id": raw.get("case_id", ""),
-                "doc_type": raw.get("doc_type", ""),
-            }
-            items.append(_result_to_rag_item(raw))
-
-    return {
-        "query": q,
-        "mode": mode,
-        "collection_name": collection_name,
-        "embedding_backend": rag_report.get("embedding_backend", "fallback"),
-        "results": items[:top_k],
-    }
-
-
 @router.post("/write")
 async def write_knowledge(
     request: KnowledgeUpdateRequest,
     _: None = Depends(require_admin_token),
-) -> Dict[str, Any]:
+) -> Dict[str, str]:
     """写入知识库文件"""
     kb = _get_kb()
     kb.write(request.filename, request.content, agent_id=request.agent_id)
-    return _verify_kb_write(kb, request.filename, request.content)
+    return {"status": "success", "filename": request.filename}
 
 
 @router.post("/append")
 async def append_knowledge(
     request: KnowledgeAppendRequest,
     _: None = Depends(require_admin_token),
-) -> Dict[str, Any]:
+) -> Dict[str, str]:
     """追加内容到知识库文件"""
     kb = _get_kb()
-    existing = kb.read(request.filename)
-    expected = existing + "\n\n" + request.content
-    kb.write(request.filename, expected, agent_id=request.agent_id)
-    return _verify_kb_write(kb, request.filename, expected)
+    kb.append(request.filename, request.content, agent_id=request.agent_id)
+    return {"status": "success", "filename": request.filename}
 
 
 @router.post("/snapshot")

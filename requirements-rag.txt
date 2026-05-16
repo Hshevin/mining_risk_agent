@@ -8,7 +8,10 @@ transformers>=4.41.0,<5.0.0
 tokenizers>=0.19.0,<0.21.0
 safetensors>=0.4.0,<0.5.0
 torch>=2.3.0,<2.5.0
-chromadb>=0.5.0,<0.6.0
+# Python 3.13 on Windows lacks a wheel for chromadb 0.5.x's pinned
+# chroma-hnswlib==0.7.6, so use the newer ABI3 Chroma wheel there.
+chromadb>=0.5.0,<0.6.0; python_version < "3.13"
+chromadb>=1.5.9,<2.0.0; python_version >= "3.13"
 onnxruntime>=1.18.0,<1.20.0
 faiss-cpu>=1.8.0,<1.9.0
 pytorch-crf>=0.7.0

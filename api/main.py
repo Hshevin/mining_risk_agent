@@ -11,7 +11,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.exception_handlers import register_exception_handlers
-from api.routers import audit, data, iteration, knowledge, memory, prediction
+from api.routers import audit, data, iteration, knowledge, memory, memory, prediction
 from api.routers.prediction import agent_router
 from api.schemas.common import HealthPayload
 from utils.config import get_config
@@ -61,6 +61,7 @@ def create_app() -> FastAPI:
     app.include_router(data.router, prefix="/api/v1/data", tags=["数据管理"])
     app.include_router(prediction.router, prefix="/api/v1/prediction", tags=["风险预测"])
     app.include_router(knowledge.router, prefix="/api/v1/knowledge", tags=["知识库"])
+    app.include_router(memory.router, prefix="/api/v1/memory", tags=["记忆系统"])
     app.include_router(audit.router, prefix="/api/v1/audit", tags=["审计日志"])
     app.include_router(agent_router, prefix="/api/v1/agent", tags=["决策智能体"])
     app.include_router(iteration.router, prefix="/api/v1/iteration", tags=["模型迭代"])

@@ -18,6 +18,20 @@ from harness.memory import ShortTermMemory, LongTermMemory, HybridMemoryManager
 from harness.vector_store import VectorStore
 
 
+def _char_tokens(text: str) -> int:
+    """测试专用确定性 token 计数，避免 tiktoken/fallback 环境差异。"""
+    return len(text)
+
+
+def _short_memory(max_tokens: int, safety_threshold: float = 1.0, llm=None) -> ShortTermMemory:
+    return ShortTermMemory(
+        max_tokens=max_tokens,
+        safety_threshold=safety_threshold,
+        llm=llm,
+        token_counter=_char_tokens,
+    )
+
+
 # ---------------------------------------------------------------------------
 # Mock 嵌入函数（与 test_vector_store.py 保持一致）
 # ---------------------------------------------------------------------------
@@ -49,17 +63,14 @@ class TestShortTermMemory:
 
     def test_token_cleanup_p0_retained_p3_cleared(self):
         """检查点：token 超限清理后 P0 仍在、P3 清空"""
-        # 使用较小的限制，并让非 P3 条目本身接近限制，
-        # 这样任何 P3 加入后都会因超限而被完全清除。
-        mem = ShortTermMemory(max_tokens=100, safety_threshold=0.8)
-        # P0 + P1 + P2 合计约 70 tokens，已接近 80 的限值
-        mem.add("P0核心指令很长很长很长很长很长", priority="P0")
-        mem.add("P1高优先级记忆内容很长很长", priority="P1")
-        mem.add("P2中优先级记忆内容很长", priority="P2")
+        mem = _short_memory(max_tokens=30)
+        mem.add("0" * 10, priority="P0")
+        mem.add("1" * 8, priority="P1")
+        mem.add("2" * 10, priority="P2")
 
-        # 大量 P3 触发清理；由于非 P3 已接近限值，所有 P3 都应被清除
+        # 非 P3 已接近限值，任何 P3 加入后都应被最先清掉。
         for i in range(20):
-            mem.add(f"P3冗余信息{i} " * 8, priority="P3")
+            mem.add(f"p3-{i}", priority="P3")
 
         all_entries = mem.get_all()
         p0_entries = [e for e in all_entries if e["priority"] == "P0"]
@@ -73,25 +84,23 @@ class TestShortTermMemory:
 
     def test_p2_lossless_compression(self):
         """P2 在超限时应被无损压缩"""
-        mem = ShortTermMemory(max_tokens=80, safety_threshold=0.8)
-        mem.add("P0核心指令", priority="P0")
-        mem.add("P1记忆" * 10, priority="P1")
-        mem.add("P2中优先级记忆内容很长很长很长很长很长", priority="P2")
+        mem = _short_memory(max_tokens=80)
+        mem.add("0" * 10, priority="P0")
+        mem.add("2" * 120, priority="P2")
 
-        # 添加 P3 触发清理，清理后若仍超限则压缩 P2
-        for i in range(10):
-            mem.add(f"P3冗余{i}" * 6, priority="P3")
+        # P3 先被清理；清理后仍超限，P2 进入压缩阶段。
+        mem.add("3" * 20, priority="P3")
 
         p2_entries = [e for e in mem.get_all() if e["priority"] == "P2"]
-        if p2_entries:
-            assert "...[压缩]" in p2_entries[0]["content"]
+        assert len(p2_entries) == 1
+        assert "...[压缩]" in p2_entries[0]["content"]
+        assert sum(e["tokens"] for e in mem.get_all()) <= mem.token_limit
 
     def test_p1_summary_downgrade_with_fallback(self):
         """P1 在超限时应被摘要降级（fallback 模式也验证）"""
-        # 限制较小且不加 P3，迫使 P1 进入摘要降级阶段
-        mem = ShortTermMemory(max_tokens=30, safety_threshold=0.8)
-        mem.add("P0核心指令很长", priority="P0")
-        mem.add("P1高优先级记忆内容很长很长很长很长", priority="P1")
+        mem = _short_memory(max_tokens=80)
+        mem.add("0" * 10, priority="P0")
+        mem.add("P1" * 60, priority="P1")
 
         p1_entries = [e for e in mem.get_all() if e["priority"] == "P1"]
         assert len(p1_entries) == 1
@@ -99,6 +108,8 @@ class TestShortTermMemory:
 
         summaries = mem.get_p1_summaries()
         assert len(summaries) >= 1, "应记录 P1 摘要"
+        mem.clear_p1_summaries()
+        assert mem.get_p1_summaries() == []
 
     def test_p1_summary_with_fake_llm(self):
         """检查点：P1 摘要降级使用 LLM（FakeListLLM 测试）"""
@@ -106,9 +117,9 @@ class TestShortTermMemory:
         from langchain_community.llms.fake import FakeListLLM
 
         fake_llm = FakeListLLM(responses=["这是P1记忆的摘要结果"])
-        mem = ShortTermMemory(max_tokens=30, safety_threshold=0.8, llm=fake_llm)
-        mem.add("P0核心指令很长", priority="P0")
-        mem.add("P1高优先级记忆内容很长很长很长很长", priority="P1")
+        mem = _short_memory(max_tokens=80, llm=fake_llm)
+        mem.add("0" * 10, priority="P0")
+        mem.add("P1" * 60, priority="P1")
 
         p1_entries = [e for e in mem.get_all() if e["priority"] == "P1"]
         assert len(p1_entries) == 1
@@ -251,17 +262,46 @@ class TestHybridMemoryManager:
                 db_path=os.path.join(tmpdir, "test.db"),
                 git_repo_path=os.path.join(tmpdir, "git"),
             )
-            short = ShortTermMemory(max_tokens=30, safety_threshold=0.8)
+            short = _short_memory(max_tokens=80)
             long = LongTermMemory(agentfs=fs)
             manager = HybridMemoryManager(short_term=short, long_term=long)
 
-            short.add("P0核心指令很长", priority="P0")
-            short.add("P1记忆很长很长很长很长很长很长", priority="P1")
-            # 不添加 P3，迫使 P1 被摘要
+            short.add("0" * 10, priority="P0")
+            short.add("P1归档摘要" * 12, priority="P1", metadata={"risk": "高"})
 
             assert len(short.get_p1_summaries()) >= 1
             await manager.archive_experience()
             assert len(short.get_p1_summaries()) == 0
 
-            content = fs.read("memory/风险事件归档.md").decode("utf-8")
-            assert "...[摘要]" in content or "P1记忆" in content
+            content = fs.read(long.memory_files[1]).decode("utf-8")
+            assert "P1归档摘要" in content
+            assert "...[摘要]" in content
+
+    @pytest.mark.asyncio
+    async def test_formal_rag_recall_enabled(self, monkeypatch):
+        """RAG 开启时应从正式 data/chroma_db 返回证据块。"""
+        monkeypatch.setenv("RAG_ENABLED", "true")
+        manager = HybridMemoryManager()
+        try:
+            assert manager.is_long_term_rag_enabled() is True
+            results = await manager.recall_long_term("粉尘涉爆除尘系统异常", risk_level="红", top_k=3)
+            assert results
+            joined = "\n".join(r["text"] for r in results)
+            assert "粉尘" in joined
+            assert "除尘" in joined
+        finally:
+            store = getattr(manager.long_term, "_vector_store", None)
+            if store is not None:
+                try:
+                    store.client._system.stop()
+                except Exception:
+                    pass
+
+    @pytest.mark.asyncio
+    async def test_rag_disabled_returns_empty(self, monkeypatch):
+        """RAG 关闭时长期记忆召回应安全返回空列表。"""
+        monkeypatch.setenv("RAG_ENABLED", "false")
+        manager = HybridMemoryManager()
+        assert manager.is_long_term_rag_enabled() is False
+        results = await manager.recall_long_term("粉尘涉爆除尘系统异常", top_k=3)
+        assert results == []

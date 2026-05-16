@@ -10,9 +10,10 @@
 
 import asyncio
 import json
+import os
 import time
 import warnings
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from harness.agentfs import AgentFS
 from harness.knowledge_base import KnowledgeBaseManager
@@ -23,6 +24,34 @@ from utils.exceptions import MemoryManagerError
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
+
+
+def _env_bool(names: List[str], default: Optional[bool] = None) -> Optional[bool]:
+    for name in names:
+        value = os.getenv(name)
+        if value is None:
+            continue
+        return value.strip().lower() in {"1", "true", "yes", "on", "y"}
+    return default
+
+
+def _risk_type_filter(value: Optional[str]) -> Optional[Dict[str, str]]:
+    if not value:
+        return None
+    normalized = value.strip()
+    if normalized in {"红", "橙", "黄", "蓝", "A", "B", "C", "D", "高", "中", "低"}:
+        return None
+    if any(token in normalized for token in ("粉尘", "涉爆", "除尘")):
+        return {"risk_type": "粉尘涉爆"}
+    if any(token in normalized for token in ("危化", "危险化学", "储罐", "泄漏")):
+        return {"risk_type": "危化品"}
+    if any(token in normalized for token in ("煤气", "冶金", "熔融", "高炉", "转炉")):
+        return {"risk_type": "冶金煤气"}
+    if any(token in normalized for token in ("有限空间", "受限空间", "中毒窒息", "缺氧")):
+        return {"risk_type": "有限空间"}
+    if any(token in normalized for token in ("火灾", "爆炸")):
+        return {"risk_type": "火灾爆炸"}
+    return None
 
 try:
     import tiktoken
@@ -84,9 +113,10 @@ class _SimpleSummarizer:
     """当无 LLM 可用时的纯文本降级摘要器"""
 
     def summarize(self, text: str) -> str:
-        if len(text) > 100:
-            return text[:100] + "...[摘要]"
-        return text + "...[摘要]"
+        if not text:
+            return "...[摘要]"
+        max_len = min(100, max(1, len(text) // 2))
+        return text[:max_len] + "...[摘要]"
 
 
 # ---------------------------------------------------------------------------
@@ -112,14 +142,16 @@ class ShortTermMemory:
         max_tokens: int = 180000,
         safety_threshold: float = 0.8,
         llm: Optional[Any] = None,
+        token_counter: Optional[Callable[[str], int]] = None,
     ):
         config = get_config()
         self.max_tokens = max_tokens
         self.safety_threshold = safety_threshold
-        self.token_limit = int(max_tokens * safety_threshold)
+        self.token_limit = max(1, int(max_tokens * safety_threshold))
         self.memory: List[Dict[str, Any]] = []
         self.priority_order = {"P3": 0, "P2": 1, "P1": 2, "P0": 3}
         self._summarized_p1: List[Dict[str, Any]] = []
+        self._token_counter = token_counter
         self._encoder = None
         if tiktoken is not None:
             try:
@@ -141,10 +173,42 @@ class ShortTermMemory:
         return _SimpleSummarizer()
 
     def _count_tokens(self, text: str) -> int:
+        if self._token_counter is not None:
+            return max(0, int(self._token_counter(text)))
         if self._encoder is not None:
             return len(self._encoder.encode(text))
-        # fallback：按字符数估计
-        return len(text) // 4 + 1
+        if not text:
+            return 0
+
+        # fallback：英文近似按 4 字符/token，CJK 字符按 1 token 计。
+        # 这样在缺少 tiktoken 的环境下不会严重低估中文短期记忆体量。
+        tokens = 0
+        ascii_run = 0
+        for ch in text:
+            code = ord(ch)
+            is_cjk = (
+                0x4E00 <= code <= 0x9FFF
+                or 0x3400 <= code <= 0x4DBF
+                or 0x20000 <= code <= 0x2A6DF
+                or 0x2A700 <= code <= 0x2B73F
+                or 0x2B740 <= code <= 0x2B81F
+                or 0x2B820 <= code <= 0x2CEAF
+                or 0xF900 <= code <= 0xFAFF
+            )
+            if is_cjk:
+                if ascii_run:
+                    tokens += (ascii_run + 3) // 4
+                    ascii_run = 0
+                tokens += 1
+            elif ch.isspace():
+                if ascii_run:
+                    tokens += (ascii_run + 3) // 4
+                    ascii_run = 0
+            else:
+                ascii_run += 1
+        if ascii_run:
+            tokens += (ascii_run + 3) // 4
+        return max(1, tokens)
 
     def _summarize_text(self, text: str) -> str:
         """使用 ConversationSummaryMemory（或兼容层）生成摘要"""
@@ -225,8 +289,11 @@ class ShortTermMemory:
             for entry in p1_entries:
                 if current_total <= self.token_limit:
                     break
+                if entry.get("summarized"):
+                    continue
                 idx = self.memory.index(entry)
                 original = entry["content"]
+                original_tokens = entry["tokens"]
                 summary = self._summarize_text(original)
                 summary_tokens = self._count_tokens(summary)
 
@@ -240,7 +307,8 @@ class ShortTermMemory:
 
                 self.memory[idx]["content"] = summary
                 self.memory[idx]["tokens"] = summary_tokens
-                current_total = current_total - entry["tokens"] + summary_tokens
+                self.memory[idx]["summarized"] = True
+                current_total = current_total - original_tokens + summary_tokens
                 logger.debug(f"摘要 P1 记忆: {original[:50]}...")
 
         # 阶段 3：P2 无损压缩
@@ -249,15 +317,19 @@ class ShortTermMemory:
             for entry in p2_entries:
                 if current_total <= self.token_limit:
                     break
+                if entry.get("compressed"):
+                    continue
                 idx = self.memory.index(entry)
                 original = entry["content"]
+                original_tokens = entry["tokens"]
                 half_len = max(10, len(original) // 2)
                 compressed = original[:half_len] + "...[压缩]"
                 compressed_tokens = self._count_tokens(compressed)
 
                 self.memory[idx]["content"] = compressed
                 self.memory[idx]["tokens"] = compressed_tokens
-                current_total = current_total - entry["tokens"] + compressed_tokens
+                self.memory[idx]["compressed"] = True
+                current_total = current_total - original_tokens + compressed_tokens
                 logger.debug(f"压缩 P2 记忆: {original[:50]}...")
 
     def get_context(self, max_tokens: Optional[int] = None) -> str:
@@ -495,6 +567,9 @@ class LongTermMemory:
     def is_rag_enabled(self) -> bool:
         """长期记忆 RAG 开关，默认开启；部署配置可显式关闭以隔离 native 依赖。"""
         try:
+            env_override = _env_bool(["RAG_ENABLED", "MINING_RAG_ENABLED", "HARNESS_RAG_ENABLED"])
+            if env_override is not None:
+                return env_override
             config = get_config()
             return bool(config.harness.memory.long_term.rag.get("enabled", True))
         except Exception as e:
@@ -572,9 +647,7 @@ class LongTermMemory:
 
         def _do_recall():
             # 构建 SelfQuery 过滤器
-            filters = {}
-            if risk_level:
-                filters["risk_type"] = risk_level
+            filters = _risk_type_filter(risk_level)
 
             # 阶段 1：VectorStore 检索
             vs = self._get_vector_store()
@@ -583,6 +656,13 @@ class LongTermMemory:
                 filters=filters if filters else None,
                 top_k=self._top_k_retrieval,
             )
+            if not candidates and filters:
+                logger.info("带 risk_type 过滤未召回结果，降级为无过滤召回")
+                candidates = vs.self_query_retrieve(
+                    query=query,
+                    filters=None,
+                    top_k=self._top_k_retrieval,
+                )
 
             if not candidates:
                 return []

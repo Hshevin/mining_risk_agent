@@ -46,6 +46,7 @@ open http://localhost:8501
 - [十三、前端演示指南](#十三前端演示指南)
 - [十四、检查点验证](#十四检查点验证)
 - [十五、运行测试](#十五运行测试)
+- [Demo Replay 数据源（模型迭代路演）](#demo-replay-数据源模型迭代路演)
 - [十六、常见问题](#十六常见问题)
 - [十七、许可证](#十七许可证)
 
@@ -162,7 +163,7 @@ Vite 已配置开发态代理：`/api/*` 与 `/health` 自动转发到 `http://l
 python -m mining_risk_agent.model.train
 ```
 
-训练完成后，模型文件将保存至 `models/stacking_risk_v1.pkl`，预处理 Pipeline 保存至 `models/preprocessing_pipeline.pkl`。
+训练完成后，模型文件将保存至 `models/stacking_risk_v1_stable.pkl`，预处理 Pipeline 保存至 `models/preprocessing_pipeline.pkl`。
 
 #### 训练 NER 实体抽取模型
 
@@ -1194,7 +1195,7 @@ mining_risk_agent/
 │   ├── decision_v1_metallurgy.txt
 │   └── decision_v1_dust.txt
 ├── models/               # 训练产出模型
-│   ├── stacking_risk_v1.pkl
+│   ├── stacking_risk_v1_stable.pkl
 │   └── preprocessing_pipeline.pkl
 ├── reports/figures/      # 可视化报告输出目录
 ├── knowledge_base/       # Markdown 知识库（运行时生成）
@@ -1379,6 +1380,31 @@ pytest tests/test_iteration.py -v
 # 全部测试（含覆盖率）
 pytest tests/ -v --cov=mining_risk_agent --cov-report=html
 ```
+
+### Demo Replay 数据源（模型迭代路演）
+
+当前模型迭代系统默认使用 `DemoReplayDataSource`，从 `data/demo/*.json` 读取可回放演示批次。每个批次都包含 `metadata.batch_id`、`sample_count`、`risk_sample_count`、`recent_f1` 和 `description`，后端会基于这些元信息和批次内的门禁结果生成真实接口响应、回放报告和可追踪记录，而不是把触发逻辑写死在前端。
+
+已内置 5 类路演场景：
+
+| batch_id | 场景 |
+|----------|------|
+| `normal_batch` | 正常批次，不触发重训 |
+| `risk_spike_retrain` | 新增风险样本超过 5000，触发重训 |
+| `f1_drop_retrain` | 近期 F1 低于 0.85，触发重训 |
+| `regression_block` | 新模型退化，回归测试门禁阻断 |
+| `drift_high_block` | Drift 高风险，Drift 门禁阻断 |
+
+接口：
+
+| 接口 | 说明 |
+|------|------|
+| `GET /api/v1/iteration/data-source` | 查看当前迭代数据源配置 |
+| `GET /api/v1/iteration/demo-batches` | 列出所有演示批次元信息 |
+| `GET /api/v1/iteration/demo-batches/{batch_id}` | 加载某个演示批次和样本预览 |
+| `POST /api/v1/iteration/demo-batches/{batch_id}/load` | 回放批次，更新后端迭代状态，写入 `demo_replay_runs` 和 `reports/demo_replay/{batch_id}_report.json` |
+
+未来接入真实企业数据库时，只需实现 `EnterpriseDataSource` 的 `list_batches()` 与 `load_batch(batch_id)`，并在 `config.yaml` 的 `iteration.data_source.type` 中切换工厂实现；监控阈值、回放报告和门禁判断仍由后端迭代模块统一处理。
 
 ## 十六、常见问题
 

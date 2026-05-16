@@ -9,6 +9,7 @@ import tempfile
 import pytest
 
 from harness.vector_store import VectorStore, split_by_headers
+from utils.config import resolve_project_path
 
 
 def _mock_embed(texts):
@@ -158,3 +159,46 @@ class TestVectorStore:
             store.clear()
             results = store.similarity_search("test", top_k=1)
             assert results == []
+
+
+class TestFormalRagIndex:
+    """正式 data/chroma_db 索引冒烟测试。"""
+
+    @pytest.fixture(autouse=True)
+    def _cleanup_store(self):
+        self._store = None
+        yield
+
+    def _formal_store(self):
+        self._store = VectorStore(
+            persist_directory="data/chroma_db",
+            collection_name="knowledge_base",
+            embedding_backend="fallback",
+        )
+        return self._store
+
+    def test_formal_index_exists_and_collection_name(self):
+        persist_dir = resolve_project_path("data/chroma_db")
+        assert persist_dir.exists()
+        assert (persist_dir / "chroma.sqlite3").exists()
+
+        store = self._formal_store()
+        assert store.collection.name == "knowledge_base"
+        assert store.collection.count() > 100
+
+    @pytest.mark.parametrize(
+        ("query", "required_terms"),
+        [
+            ("粉尘涉爆除尘系统异常", ("粉尘", "除尘")),
+            ("危化品泄漏处置", ("危化", "泄漏")),
+            ("冶金煤气报警", ("冶金", "煤气")),
+            ("有限空间作业中毒窒息", ("有限空间", "中毒")),
+        ],
+    )
+    def test_formal_index_recalls_related_text(self, query, required_terms):
+        store = self._formal_store()
+        results = store.similarity_search(query, top_k=5)
+        assert results
+        joined = "\n".join(r["text"] for r in results)
+        for term in required_terms:
+            assert term in joined

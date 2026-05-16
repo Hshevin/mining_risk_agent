@@ -36,11 +36,16 @@ class ProjectConfig(BaseModel):
 
 
 class DataConfig(BaseModel):
+    public_data_root: Optional[str] = None
+    all_public_data_paths: Optional[List[str]] = None
     raw_data_path: str
     reference_data_path: str
-    merged_data_path: Optional[str] = None  # 预合并训练集路径（new_已清洗.csv）
+    merged_data_path: Optional[str] = None  # 预合并训练集路径（new_已清洗.xlsx）
     supported_formats: List[str]
     encoding: str = "utf-8-sig"
+    csv_encoding_fallbacks: List[str] = Field(
+        default_factory=lambda: ["utf-8-sig", "utf-8", "gb18030", "gbk"]
+    )
     batch_size: int = 1000
     table_join_keys: Optional[Dict[str, Any]] = None  # 各原始表的主键/外键映射
 
@@ -197,6 +202,12 @@ class AuditConfig(BaseModel):
     auto_archive: bool
 
 
+class DataSourceConfig(BaseModel):
+    type: str = "demo_replay"
+    demo_dir: str = "data/demo"
+    reports_dir: str = "reports/demo_replay"
+
+
 class MonitorConfig(BaseModel):
     sample_threshold: int = 5000
     f1_threshold: float = 0.85
@@ -227,6 +238,7 @@ class SMTPConfig(BaseModel):
 
 
 class IterationConfig(BaseModel):
+    data_source: DataSourceConfig = Field(default_factory=DataSourceConfig)
     monitor: MonitorConfig = Field(default_factory=MonitorConfig)
     approvers: ApproversConfig = Field(default_factory=ApproversConfig)
     canary: CanaryConfig = Field(default_factory=CanaryConfig)

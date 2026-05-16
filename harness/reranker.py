@@ -8,6 +8,7 @@
     ranked = reranker.rerank("高炉煤气泄漏", passages, top_k=5)
 """
 
+import re
 from typing import Any, Dict, List, Optional
 
 try:
@@ -22,6 +23,33 @@ from utils.config import get_config
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
+
+
+def _lexical_score(query: str, text: str) -> float:
+    query_norm = re.sub(r"\s+", "", query.lower())
+    text_norm = re.sub(r"\s+", "", text.lower())
+    if not query_norm or not text_norm:
+        return 0.0
+
+    score = 0.0
+    domain_phrases = [
+        "粉尘涉爆", "粉尘爆炸", "除尘系统", "除尘", "危化品", "危险化学品",
+        "泄漏", "储罐", "冶金", "煤气", "报警", "有限空间", "中毒窒息",
+        "中毒和窒息", "通风", "检测", "动火", "联锁",
+    ]
+    for phrase in domain_phrases:
+        if phrase in query_norm and phrase in text_norm:
+            score += 4.0
+
+    for n, weight in ((4, 1.5), (3, 1.2), (2, 0.7), (1, 0.1)):
+        if len(query_norm) < n:
+            continue
+        grams = {query_norm[i:i + n] for i in range(len(query_norm) - n + 1)}
+        if not grams:
+            continue
+        hits = sum(1 for gram in grams if gram in text_norm)
+        score += weight * hits / len(grams)
+    return score
 
 
 class Reranker:
@@ -41,6 +69,7 @@ class Reranker:
         )
         self.device = device
         self._model: Optional[Any] = None
+        self._fallback_warned = False
 
     def _load_model(self) -> Any:
         if CrossEncoder is None:
@@ -74,6 +103,13 @@ class Reranker:
         """
         if not passages:
             return []
+
+        if CrossEncoder is None:
+            if not self._fallback_warned:
+                detail = f": {_CROSS_ENCODER_IMPORT_ERROR}" if _CROSS_ENCODER_IMPORT_ERROR else ""
+                logger.warning(f"真实 reranker 不可用，使用 deterministic fallback{detail}")
+                self._fallback_warned = True
+            return self._fallback_rerank(query, passages, top_k)
         
         try:
             model = self._load_model()
@@ -92,11 +128,17 @@ class Reranker:
             scored_passages.sort(key=lambda x: x["rerank_score"], reverse=True)
             return scored_passages[:top_k]
         except Exception as e:
-            logger.warning(f"重排序模型推理失败: {e}，回退到原始顺序")
-            # 回退：保持原始顺序，给每个结果一个默认分数
-            for i, p in enumerate(passages):
-                p["rerank_score"] = 1.0 - i * 0.01
-            return passages[:top_k]
+            logger.warning(f"重排序模型推理失败: {e}，使用 deterministic fallback")
+            return self._fallback_rerank(query, passages, top_k)
+
+    def _fallback_rerank(self, query: str, passages: List[Dict], top_k: int) -> List[Dict]:
+        scored_passages = []
+        for i, passage in enumerate(passages):
+            item = dict(passage)
+            item["rerank_score"] = _lexical_score(query, item.get("text", "")) - i * 0.0001
+            scored_passages.append(item)
+        scored_passages.sort(key=lambda x: x["rerank_score"], reverse=True)
+        return scored_passages[:top_k]
 
 
 def rerank(
