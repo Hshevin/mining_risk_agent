@@ -178,28 +178,40 @@ _memory: Optional[HybridMemoryManager] = None
 
 
 def _load_model() -> StackingRiskModel:
+    """加载堆叠模型单例；加载失败时重置单例并抛出，避免缓存未训练实例导致后续请求误降级。"""
     global _model
     if _model is None:
         config = get_config()
         model_path = config.model.stacking.model_path
-        _model = StackingRiskModel()
-        if os.path.exists(model_path):
-            _model.load(model_path)
-        else:
-            logger.warning("模型文件不存在，返回未训练实例")
+        candidate = StackingRiskModel()
+        if not os.path.exists(model_path):
+            raise FileNotFoundError(
+                f"模型文件不存在: {model_path}，请先训练或检查 config.model.stacking.model_path"
+            )
+        try:
+            candidate.load(model_path)
+        except Exception as exc:
+            logger.error(f"模型加载失败 ({model_path}): {exc}")
+            raise RuntimeError(f"模型加载失败: {exc}") from exc
+        _model = candidate
     return _model
 
 
 def _load_pipeline() -> FeatureEngineeringPipeline:
+    """加载特征工程流水线单例；加载失败时抛出明确异常。"""
     global _pipeline
     if _pipeline is None:
         config = get_config()
         pipeline_path = config.model.stacking.pipeline_path
-        _pipeline = FeatureEngineeringPipeline()
-        if os.path.exists(pipeline_path):
-            _pipeline.load(pipeline_path)
-        else:
-            logger.warning("Pipeline 文件不存在，返回未训练实例")
+        candidate = FeatureEngineeringPipeline()
+        if not os.path.exists(pipeline_path):
+            raise FileNotFoundError(f"Pipeline 文件不存在: {pipeline_path}")
+        try:
+            candidate.load(pipeline_path)
+        except Exception as exc:
+            logger.error(f"Pipeline 加载失败 ({pipeline_path}): {exc}")
+            raise RuntimeError(f"Pipeline 加载失败: {exc}") from exc
+        _pipeline = candidate
     return _pipeline
 
 
@@ -369,7 +381,6 @@ async def node_decision_generation(state: AgentState, scenario: ScenarioConfig) 
         )
 
         config = get_config()
-<<<<<<< HEAD
         llm_cfg = config.llm.active
         client = OpenAICompatibleClient(
             api_key=llm_cfg.api_key or None,
@@ -385,15 +396,6 @@ async def node_decision_generation(state: AgentState, scenario: ScenarioConfig) 
             temperature=llm_cfg.default_temperature,
             max_tokens=llm_cfg.default_max_tokens,
         )
-=======
-        llm_cfg = config.llm.glm5
-        client = GLM5Client(
-            api_key=llm_cfg.api_key or None,
-            base_url=llm_cfg.base_url or None,
-            model=llm_cfg.model or None,
-        )
-        decision = await client.generate_json(prompt, temperature=llm_cfg.default_temperature)
->>>>>>> e7cc200 (some changes)
         state["decision"] = decision
 
         # ------------------------------------------------------------------

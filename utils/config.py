@@ -11,6 +11,23 @@ from typing import Any, Dict, List, Optional
 import yaml
 from pydantic import BaseModel, Field, model_validator
 
+try:
+    from dotenv import load_dotenv
+except ImportError:  # pragma: no cover - optional in minimal runtimes
+    load_dotenv = None
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+if load_dotenv is not None:
+    load_dotenv(PROJECT_ROOT / ".env")
+
+
+def resolve_project_path(path: str | Path) -> Path:
+    """Resolve a config path relative to the mining_risk_agent project root."""
+    path_obj = Path(path)
+    if path_obj.is_absolute():
+        return path_obj.resolve()
+    return (PROJECT_ROOT / path_obj).resolve()
+
 
 class ProjectConfig(BaseModel):
     name: str
@@ -231,21 +248,6 @@ class LLMProviderConfig(BaseModel):
     default_temperature: float = 0.3
     default_max_tokens: int = 8192
     max_retries: int = 3
-
-    @model_validator(mode="after")
-    def _apply_env_override(self) -> "GLM5Config":
-        env_key = os.getenv("GLM5_API_KEY")
-        if env_key:
-            self.api_key = env_key
-        if not self.api_key:
-            raise ValueError(
-                "GLM-5 API Key 未配置，请设置环境变量 GLM5_API_KEY"
-            )
-        return self
-
-
-class LLMConfig(BaseModel):
-    glm5: GLM5Config = Field(default_factory=GLM5Config)
 
 
 class LLMConfig(BaseModel):

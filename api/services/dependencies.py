@@ -48,25 +48,44 @@ class ResourceRegistry:
 
     Returns:
         已加载或新实例化的 ``StackingRiskModel``。
+
+    Raises:
+        FileNotFoundError: 配置的模型路径不存在。
+        RuntimeError: 模型文件存在但反序列化失败，单例会被重置以便下次重试。
     """
     if self._model is None:
       config = get_config()
       model_path = config.model.stacking.model_path
-      self._model = StackingRiskModel()
-      if os.path.exists(model_path):
-        self._model.load(model_path)
-      else:
-        logger.warning("模型文件不存在，返回未训练实例")
+      candidate = StackingRiskModel()
+      if not os.path.exists(model_path):
+        raise FileNotFoundError(f"模型文件不存在: {model_path}，请先训练或检查 config.model.stacking.model_path")
+      try:
+        candidate.load(model_path)
+      except Exception as exc:
+        logger.error("模型加载失败 (%s): %s", model_path, exc)
+        raise RuntimeError(f"模型加载失败: {exc}") from exc
+      self._model = candidate
     return self._model
 
   def get_pipeline(self) -> FeatureEngineeringPipeline:
-    """获取或懒加载特征工程流水线。"""
+    """获取或懒加载特征工程流水线。
+
+    Raises:
+        FileNotFoundError: 配置的流水线路径不存在。
+        RuntimeError: 文件存在但反序列化失败。
+    """
     if self._pipeline is None:
       config = get_config()
       pipeline_path = config.model.stacking.pipeline_path
-      self._pipeline = FeatureEngineeringPipeline()
-      if os.path.exists(pipeline_path):
-        self._pipeline.load(pipeline_path)
+      candidate = FeatureEngineeringPipeline()
+      if not os.path.exists(pipeline_path):
+        raise FileNotFoundError(f"Pipeline 文件不存在: {pipeline_path}")
+      try:
+        candidate.load(pipeline_path)
+      except Exception as exc:
+        logger.error("Pipeline 加载失败 (%s): %s", pipeline_path, exc)
+        raise RuntimeError(f"Pipeline 加载失败: {exc}") from exc
+      self._pipeline = candidate
     return self._pipeline
 
   def get_memory(self) -> HybridMemoryManager:

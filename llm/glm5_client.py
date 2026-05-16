@@ -16,15 +16,9 @@ from utils.logger import get_logger
 logger = get_logger(__name__)
 
 
-<<<<<<< HEAD
-DEFAULT_BASE_URL = ""
-DEFAULT_MODEL = ""
-DEFAULT_API_KEY = ""
-=======
 DEFAULT_BASE_URL = "https://open.bigmodel.cn/api/paas/v4/"
 DEFAULT_MODEL = "glm-5"
-DEFAULT_API_KEY = ""  # set GLM5_API_KEY env var in production
->>>>>>> e7cc200 (some changes)
+DEFAULT_API_KEY = ""
 
 
 class OpenAICompatibleClient:

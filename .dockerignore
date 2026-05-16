@@ -9,14 +9,11 @@ __pycache__
 htmlcov
 .mypy_cache
 
-<<<<<<< HEAD
 # 本地环境变量与密钥
 .env
 .env.*
 !.env.example
 
-=======
->>>>>>> e7cc200 (some changes)
 # 前端 SPA 工程对后端镜像无意义
 frontend/node_modules
 frontend/dist

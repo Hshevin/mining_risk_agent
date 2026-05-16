@@ -487,4 +487,14 @@ class StackingRiskModel:
         self.meta_learner = data["meta_learner"]
         self.config = data["config"]
         self.risk_levels = data["risk_levels"]
-        logger.info(f"模型已从 {path} 加载")
+        meta_fitted = hasattr(self.meta_learner, "coef_")
+        base_summary = ", ".join(
+            f"{name}={type(model).__name__}" for name, model in self.base_learners.items()
+        )
+        logger.info(
+            f"模型已从 {path} 加载 (meta_fitted={meta_fitted}, base_learners=[{base_summary}])"
+        )
+        if not meta_fitted:
+            logger.warning(
+                "元学习器未 fitted，predict() 将抛 ModelInferenceError；请确认 pkl 是否由 train.py 完整训练后保存。"
+            )

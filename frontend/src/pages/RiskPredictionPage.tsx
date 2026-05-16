@@ -29,6 +29,8 @@ const LEVEL_GLOW: Record<string, string> = {
   蓝: "glow-blue",
 };
 
+type MockSource = "backend" | "frontend" | null;
+
 export default function RiskPredictionPage({ scenario }: Props) {
   const [enterpriseId, setEnterpriseId] = useState("ENT-DEMO-001");
   const [dataText, setDataText] = useState(() => getDemoDataJson(scenario));
@@ -39,6 +41,7 @@ export default function RiskPredictionPage({ scenario }: Props) {
   const [decision, setDecision] = useState<DecisionResponse | null>(null);
   const [streamLog, setStreamLog] = useState<NodeStatus[]>([]);
   const [useStream, setUseStream] = useState(true);
+  const [mockSource, setMockSource] = useState<MockSource>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
@@ -80,6 +83,7 @@ export default function RiskPredictionPage({ scenario }: Props) {
     setLoading(true);
     setStreamLog([]);
     setDecision(null);
+    setMockSource(null);
 
     let result: DecisionResponse | null = null;
     if (useStream) {
@@ -105,9 +109,11 @@ export default function RiskPredictionPage({ scenario }: Props) {
     }
     if (result) {
       setDecision(result);
+      setMockSource(result.mock ? "backend" : null);
     } else {
       setError("后端无响应，启用本地 Mock 数据");
       setDecision(generateMockDecision(scenario, enterpriseId));
+      setMockSource("frontend");
     }
     setLoading(false);
   }
@@ -221,7 +227,13 @@ export default function RiskPredictionPage({ scenario }: Props) {
               <TimelineLogs nodes={streamLog} />
             </div>
           )}
-          {decision && <DecisionView decision={decision} streamLog={streamLog} />}
+          {decision && (
+            <DecisionView
+              decision={decision}
+              streamLog={streamLog}
+              mockSource={mockSource}
+            />
+          )}
         </div>
       </div>
     </div>
@@ -257,14 +269,19 @@ function SpinnerBox() {
 interface DecisionProps {
   decision: DecisionResponse;
   streamLog: NodeStatus[];
+  mockSource?: MockSource;
 }
 
-function DecisionView({ decision, streamLog }: DecisionProps) {
+function DecisionView({ decision, streamLog, mockSource }: DecisionProps) {
   const level = decision.predicted_level || "未知";
   const hex = LEVEL_HEX[level] ?? "#6b7280";
   const glow = LEVEL_GLOW[level] ?? "glow-white";
   const isRed = level === "红";
   const isMock = !!decision.mock;
+  const failedNode = streamLog.find((n) => n.status === "failed");
+  const mockReason = failedNode
+    ? `${failedNode.node} 节点失败：${failedNode.error ?? failedNode.detail ?? "未知错误"}`
+    : null;
 
   const finalNodes = useMemo(() => {
     if (streamLog.length > 0) return streamLog;
@@ -324,7 +341,20 @@ function DecisionView({ decision, streamLog }: DecisionProps) {
 
       {isMock && (
         <div className="alert info">
-          当前返回为 Mock 降级数据（后端 Workflow 初始化失败或 GLM-5 API 不可用），用于路演演示。
+          {mockSource === "frontend" ? (
+            <>
+              当前为前端本地 Mock 数据：后端 API 完全无响应，已使用 <code>demoData.ts</code> 兜底渲染。
+              请检查后端是否已启动、是否监听 8000 端口、CORS 是否放行当前来源。
+            </>
+          ) : (
+            <>
+              当前为后端 Mock 降级数据：决策工作流执行未通过校验，已按
+              <code>MRA_ENABLE_MOCK_FALLBACK=true</code> 策略返回 Mock。
+              {mockReason ? <>实际失败原因：<strong>{mockReason}</strong>。</> : null}
+              生产环境可设置 <code>MRA_ENABLE_MOCK_FALLBACK=false</code> 让失败以 503 显式暴露，
+              并检查模型 pkl 是否 fitted、<code>GLM5_API_KEY</code> 是否配置。
+            </>
+          )}
         </div>
       )}
 
