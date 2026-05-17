@@ -959,5 +959,8 @@ class FeatureEngineeringPipeline:
 
     def load(self, path: str) -> None:
         """加载序列化的 Pipeline"""
+        from mining_risk_common.compat.pickle_legacy import register_legacy_pickle_modules
+
+        register_legacy_pickle_modules()
         self.pipeline = joblib.load(path)
         logger.info(f"Pipeline 已从 {path} 加载")

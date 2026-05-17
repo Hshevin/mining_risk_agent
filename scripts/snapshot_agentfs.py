@@ -11,16 +11,14 @@ import sys
 import time
 from pathlib import Path
 
-# 将项目根目录加入路径
-project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-parent_root = os.path.dirname(project_root)
-src_root = os.path.join(project_root, "src")
-if parent_root not in sys.path:
-    sys.path.insert(0, parent_root)
-if project_root not in sys.path:
-    sys.path.insert(0, project_root)
-if src_root not in sys.path:
-    sys.path.insert(0, src_root)
+from pathlib import Path as _Path
+
+_SCRIPTS = _Path(__file__).resolve().parent
+if str(_SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS))
+from _bootstrap import setup_project_paths
+
+setup_project_paths()
 
 import sqlite3
 

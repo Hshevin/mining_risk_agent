@@ -18,13 +18,12 @@ from torch.utils.data import DataLoader, Dataset
 from tqdm import tqdm
 from transformers import BertTokenizer
 
-# 将项目根目录加入 sys.path
-project_root = Path(__file__).resolve().parent.parent
-if str(project_root) not in sys.path:
-    sys.path.insert(0, str(project_root))
-src_root = project_root / "src"
-if str(src_root) not in sys.path:
-    sys.path.insert(0, str(src_root))
+_SCRIPTS = Path(__file__).resolve().parent
+if str(_SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS))
+from _bootstrap import setup_project_paths
+
+setup_project_paths()
 
 from mining_risk_serve.harness.nlp_pipeline import BertBiLSTMCRF, LABEL2ID, ID2LABEL, bio_encode
 from mining_risk_common.utils.logger import get_logger

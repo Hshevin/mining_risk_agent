@@ -153,7 +153,12 @@ python scripts/init_knowledge_base.py --data-dir datasets/raw/public
 
 ```bash
 export MINING_PROJECT_ROOT="$(pwd)"
+# 首次需安装 workspace 包（否则会出现 No module named 'mining_risk_serve'）
+uv pip install -e packages/mining_risk_common -e packages/mining_risk_train -e packages/mining_risk_serve
+
 uvicorn mining_risk_serve.api.main:app --host 0.0.0.0 --port 8000 --reload
+# 或使用封装脚本（缺包时会自动安装）：
+# bash scripts/run_api.sh --reload
 ```
 
 API 文档地址：`http://localhost:8000/docs`
@@ -171,7 +176,6 @@ Vite 已配置开发态代理：`/api/*` 与 `/health` 自动转发到 `http://l
 
 前端地址：开发态 `http://localhost:5173` ；通过 Docker 部署后为 `http://localhost:8501`。
 
-> 💡 **路演提示**：推荐在 1920×1080 分辨率下全屏演示，界面已针对投影优化，无横向滚动条。详见 [前端演示指南](#十三前端演示指南)。
 
 #### 训练模型
 

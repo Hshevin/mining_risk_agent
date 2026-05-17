@@ -10,6 +10,10 @@ from typing import List
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from mining_risk_common.compat.pickle_legacy import register_legacy_pickle_modules
+
+register_legacy_pickle_modules()
+
 from mining_risk_serve.api.exception_handlers import register_exception_handlers
 from mining_risk_serve.api.routers import audit, data, iteration, knowledge, memory, memory, prediction
 from mining_risk_serve.api.routers.prediction import agent_router

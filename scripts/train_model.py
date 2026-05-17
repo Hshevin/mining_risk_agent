@@ -3,15 +3,15 @@
 处理 PYTHONPATH 并执行训练
 """
 
-import os
 import sys
+from pathlib import Path
 
-project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-os.environ.setdefault("MINING_PROJECT_ROOT", project_root)
-for name in ("mining_risk_common", "mining_risk_train", "mining_risk_serve"):
-    src_root = os.path.join(project_root, "packages", name, "src")
-    if src_root not in sys.path:
-        sys.path.insert(0, src_root)
+_SCRIPTS = Path(__file__).resolve().parent
+if str(_SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS))
+from _bootstrap import setup_project_paths
+
+setup_project_paths()
 
 from mining_risk_train.train import train_and_save
 from mining_risk_common.utils.logger import get_logger

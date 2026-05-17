@@ -510,6 +510,9 @@ class StackingRiskModel:
 
     def load(self, path: str) -> None:
         """加载模型"""
+        from mining_risk_common.compat.pickle_legacy import register_legacy_pickle_modules
+
+        register_legacy_pickle_modules()
         data = joblib.load(path)
         self.base_learners = data["base_learners"]
         self.meta_learner = data["meta_learner"]

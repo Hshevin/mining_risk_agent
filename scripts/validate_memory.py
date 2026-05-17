@@ -8,14 +8,17 @@
 """
 
 import asyncio
-import os
 import sys
 import tempfile
 import time
+from pathlib import Path
 
-_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, _PROJECT_ROOT)
-sys.path.insert(0, os.path.join(_PROJECT_ROOT, "src"))
+_SCRIPTS = Path(__file__).resolve().parent
+if str(_SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS))
+from _bootstrap import setup_project_paths
+
+setup_project_paths()
 
 from mining_risk_serve.harness.agentfs import AgentFS
 from mining_risk_serve.harness.memory import HybridMemoryManager, ShortTermMemory, LongTermMemory
