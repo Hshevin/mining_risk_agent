@@ -27,7 +27,7 @@ from mining_risk_serve.harness.risk_assessment import RiskAssessor
 from mining_risk_serve.harness.validation import run_march_validation
 from mining_risk_serve.llm.glm5_client import OpenAICompatibleClient
 from mining_risk_common.model.stacking import StackingRiskModel
-from mining_risk_common.utils.config import get_config
+from mining_risk_common.utils.config import PROJECT_ROOT, get_config
 from mining_risk_common.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -180,8 +180,8 @@ def _dump_validation_evidence(value: Any) -> List[Dict[str, Any]]:
 
 
 def _get_project_base() -> Path:
-    # src/mining_risk/agent/workflow.py → 向上 4 层得到项目根
-    return Path(__file__).resolve().parents[3]
+    """仓库根目录（与 config.yaml、prompts/、knowledge_base/ 同级）。"""
+    return PROJECT_ROOT
 
 
 _model: Optional[StackingRiskModel] = None
