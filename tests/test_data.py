@@ -12,14 +12,14 @@ import pandas as pd
 import pytest
 from fastapi.testclient import TestClient
 
-from api.main import create_app
-from api.routers import data as data_router
-from data.loader import DataLoader, DataUploadRequest
-from data.preprocessor import (BinaryEncoder, EnumRiskMapper, FeatureEngineeringPipeline,
+from mining_risk_serve.api.main import create_app
+from mining_risk_serve.api.routers import data as data_router
+from mining_risk_common.dataplane.loader import DataLoader, DataUploadRequest
+from mining_risk_common.dataplane.preprocessor import (BinaryEncoder, EnumRiskMapper, FeatureEngineeringPipeline,
                                                    IndustryRiskCoefficient, MissingValueHandler, NumericTransformer,
                                                    TextRiskExtractor)
-from utils.config import get_config, resolve_project_path
-from utils.exceptions import DataLoadingError
+from mining_risk_common.utils.config import get_config, resolve_project_path
+from mining_risk_common.utils.exceptions import DataLoadingError
 
 
 class TestDataLoader:
@@ -122,7 +122,7 @@ class TestDataLoader:
     def test_duplicate_field_csv_deduplicates_columns(self, caplog):
         loader = DataLoader()
         duplicate_csv = resolve_project_path(
-            "../公开数据/公开数据/新数据/ds_aczf_accessory_3_202603181744.csv"
+            "datasets/raw/public/新数据/ds_aczf_accessory_3_202603181744.csv"
         )
         caplog.set_level("WARNING")
 
@@ -134,7 +134,7 @@ class TestDataLoader:
 
     def test_bad_xlsx_can_be_strict_or_skipped(self, caplog):
         loader = DataLoader()
-        bad_xlsx = resolve_project_path("../公开数据/公开数据/数据补充/enterprise_routine_check_log.xlsx")
+        bad_xlsx = resolve_project_path("datasets/raw/public/数据补充/enterprise_routine_check_log.xlsx")
         caplog.set_level("WARNING")
 
         with pytest.raises(DataLoadingError):
@@ -222,7 +222,7 @@ class TestCsvToMarkdownTable:
             f.write("name,age\nAlice,30\nBob,25\n")
             tmp = f.name
         try:
-            from data.preprocessor import csv_to_markdown_table
+            from mining_risk_common.dataplane.preprocessor import csv_to_markdown_table
             md = csv_to_markdown_table(tmp)
             assert "| name | age |" in md
             assert "| Alice | 30 |" in md
@@ -236,7 +236,7 @@ class TestCsvToMarkdownTable:
             f.write("a\n1\n2\n3\n4\n")
             tmp = f.name
         try:
-            from data.preprocessor import csv_to_markdown_table
+            from mining_risk_common.dataplane.preprocessor import csv_to_markdown_table
             md = csv_to_markdown_table(tmp, max_rows=3)
             lines = md.splitlines()
             assert len(lines) == 4  # header + separator + 2 data rows
@@ -249,7 +249,7 @@ class TestCsvToMarkdownTable:
             f.write("")
             tmp = f.name
         try:
-            from data.preprocessor import csv_to_markdown_table
+            from mining_risk_common.dataplane.preprocessor import csv_to_markdown_table
             assert csv_to_markdown_table(tmp) == ""
         finally:
             os.unlink(tmp)

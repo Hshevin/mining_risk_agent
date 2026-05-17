@@ -198,7 +198,7 @@ def _public_data_report(public_root: Path) -> dict[str, Any]:
 def build_report(project_root: Path, public_data_root: Path | None = None) -> dict[str, Any]:
     project_root = project_root.resolve()
     if public_data_root is None:
-        public_data_root = (project_root.parent / "公开数据").resolve()
+        public_data_root = (project_root / "datasets" / "raw" / "public").resolve()
     else:
         public_data_root = public_data_root.resolve()
 
@@ -221,7 +221,7 @@ def main() -> int:
     parser.add_argument(
         "--public-data-root",
         default=None,
-        help="Path to the public data root; defaults to ../公开数据",
+        help="Path to the public data root; defaults to datasets/raw/public under project root",
     )
     args = parser.parse_args()
 

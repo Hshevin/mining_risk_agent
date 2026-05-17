@@ -13,9 +13,9 @@ import tempfile
 
 import pytest
 
-from harness.agentfs import AgentFS
-from harness.memory import ShortTermMemory, LongTermMemory, HybridMemoryManager
-from harness.vector_store import VectorStore
+from mining_risk_serve.harness.agentfs import AgentFS
+from mining_risk_serve.harness.memory import ShortTermMemory, LongTermMemory, HybridMemoryManager
+from mining_risk_serve.harness.vector_store import VectorStore
 
 
 def _char_tokens(text: str) -> int:
@@ -279,7 +279,7 @@ class TestHybridMemoryManager:
 
     @pytest.mark.asyncio
     async def test_formal_rag_recall_enabled(self, monkeypatch):
-        """RAG 开启时应从正式 data/chroma_db 返回证据块。"""
+        """RAG 开启时应从正式 var/chroma 返回证据块。"""
         monkeypatch.setenv("RAG_ENABLED", "true")
         manager = HybridMemoryManager()
         try:

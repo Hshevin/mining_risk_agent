@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from data.crawler import Crawler, RegulationCrawler
+from mining_risk_common.dataplane.crawler import Crawler, RegulationCrawler
 
 
 class TestRegulationCrawler:

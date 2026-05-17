@@ -1,6 +1,6 @@
 """LLM provider 配置测试。"""
 
-from utils.config import LLMConfig, LLMProviderConfig
+from mining_risk_common.utils.config import LLMConfig, LLMProviderConfig
 
 
 def test_llm_config_defaults_to_glm5():

@@ -14,12 +14,12 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from iteration.approval_fsm import ApprovalFSM, ApprovalStatus
-from iteration.canary import CanaryDeployment
-from iteration.gitflow import GitFlowManager
-from iteration.monitor import ModelMonitor
-from iteration.regression_test import RegressionTester
-from iteration.staging_monitor import StagingMonitor
+from mining_risk_serve.iteration.approval_fsm import ApprovalFSM, ApprovalStatus
+from mining_risk_serve.iteration.canary import CanaryDeployment
+from mining_risk_serve.iteration.gitflow import GitFlowManager
+from mining_risk_serve.iteration.monitor import ModelMonitor
+from mining_risk_train.iteration.regression_test import RegressionTester
+from mining_risk_serve.iteration.staging_monitor import StagingMonitor
 
 
 class TestModelMonitor:
@@ -124,7 +124,7 @@ class TestRegressionTester:
     def test_regression_report(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             # 创建两个相同的模型用于测试
-            from model.stacking import StackingRiskModel
+            from mining_risk_common.model.stacking import StackingRiskModel
             np.random.seed(42)
             X = pd.DataFrame(np.random.randn(100, 5))
             y = pd.Series([0, 1, 2, 3] * 25)

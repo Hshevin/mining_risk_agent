@@ -1,0 +1,15 @@
+# mining_risk_serve 后端 API 依赖（不含 train 重 ML 包）
+-r requirements-common.txt
+
+fastapi>=0.100.0
+uvicorn[standard]>=0.23.0
+python-multipart>=0.0.6
+langgraph>=0.2.0
+langchain>=0.2.0
+openai>=1.0.0
+GitPython>=3.1.0
+requests>=2.31.0
+jinja2>=3.1.0
+tqdm>=4.66.0
+reportlab>=4.0.0
+tiktoken>=0.5.0

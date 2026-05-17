@@ -6,16 +6,15 @@
 import os
 import sys
 
-# 将项目根目录加入路径
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-parent_root = os.path.dirname(project_root)
-if parent_root not in sys.path:
-    sys.path.insert(0, parent_root)
-if project_root not in sys.path:
-    sys.path.insert(0, project_root)
+os.environ.setdefault("MINING_PROJECT_ROOT", project_root)
+for name in ("mining_risk_common", "mining_risk_train", "mining_risk_serve"):
+    src_root = os.path.join(project_root, "packages", name, "src")
+    if src_root not in sys.path:
+        sys.path.insert(0, src_root)
 
-from model.train import train_and_save
-from utils.logger import get_logger
+from mining_risk_train.train import train_and_save
+from mining_risk_common.utils.logger import get_logger
 
 logger = get_logger(__name__)
 

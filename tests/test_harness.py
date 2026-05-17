@@ -7,10 +7,10 @@ import tempfile
 
 import pytest
 
-from harness.agentfs import AgentFS
-from harness.knowledge_base import KnowledgeBaseManager
-from harness.memory import ShortTermMemory
-from harness.validation import Checker, MonteCarloValidator, Proposer, ValidationPipeline
+from mining_risk_serve.harness.agentfs import AgentFS
+from mining_risk_serve.harness.knowledge_base import KnowledgeBaseManager
+from mining_risk_serve.harness.memory import ShortTermMemory
+from mining_risk_serve.harness.validation import Checker, MonteCarloValidator, Proposer, ValidationPipeline
 
 
 class TestKnowledgeBase:

@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mining_risk"
+version = "1.0.0"
+description = "工矿风险智能体 — 旧 import 路径兼容层（已弃用）"
+requires-python = ">=3.10"
+dependencies = [
+    "mining_risk_common",
+    "mining_risk_serve",
+    "mining_risk_train",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["mining_risk*"]

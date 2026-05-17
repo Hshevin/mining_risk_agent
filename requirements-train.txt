@@ -1,0 +1,8 @@
+# mining_risk_train 训练包依赖（含可选 ML 栈）
+-r requirements-common.txt
+-r requirements-ml.txt
+
+matplotlib>=3.7.0
+seaborn>=0.12.0
+
+# 安装 workspace 包：pip install -e packages/mining_risk_common -e packages/mining_risk_train

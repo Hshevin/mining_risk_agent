@@ -25,19 +25,29 @@ RUN pip install --no-cache-dir uv
 
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv pip install --system -r "${REQUIREMENTS_FILE}"
-# 复制代码（注意：构建上下文为 mining_risk_agent/ 本身）
+# 复制 monorepo 包与配置
+COPY packages/ ./packages/
+COPY pyproject.toml config.yaml ./
+RUN pip install --no-cache-dir \
+    -e packages/mining_risk_common \
+    -e packages/mining_risk_train \
+    -e packages/mining_risk_serve
+
+# 其余仓库文件（知识库模板、脚本、提示词等；前端目录由 .dockerignore 排除）
 COPY . .
 
 # 运行时目录
-RUN mkdir -p models data logs knowledge_base
+RUN mkdir -p artifacts/models artifacts/pipelines \
+             datasets/raw/public datasets/interim/merged datasets/demo \
+             var/memory var/chroma var/agentfs var/uploads var/audit var/snapshots \
+             logs knowledge_base
 
 ENV PYTHONUNBUFFERED=1 \
-    PYTHONPATH=/app
+    MINING_PROJECT_ROOT=/app
 
 EXPOSE 8000
 
 HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
   CMD curl -fsS http://localhost:8000/health || exit 1
 
-# api/main.py 中 app = create_app()，挂在 api.main:app
-CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "mining_risk_serve.api.main:app", "--host", "0.0.0.0", "--port", "8000"]

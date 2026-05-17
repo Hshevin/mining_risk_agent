@@ -10,7 +10,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from agent.workflow import (
+from mining_risk_serve.agent.workflow import (
     AgentState,
     DecisionWorkflow,
     ScenarioConfig,
@@ -527,7 +527,7 @@ class TestNodeStatus:
     def test_node_status_format(self, base_state):
         state = base_state.copy()
         state["node_status"] = []
-        from agent.workflow import _push_node_status
+        from mining_risk_serve.agent.workflow import _push_node_status
         _push_node_status(state, "risk_assessment", "completed", "预测等级: 红")
         
         assert len(state["node_status"]) == 1

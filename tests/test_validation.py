@@ -8,13 +8,13 @@ import tempfile
 
 import pytest
 
-from harness.agentfs import AgentFS
-from harness.knowledge_base import KnowledgeBaseManager
-from harness.monte_carlo import MonteCarloResult, MonteCarloValidator, SamplingNode
-from harness.proposer import Proposer
-from harness.risk_assessment import RiskAssessor, RiskAssessmentResult
-from harness.rks import RecursiveKnowledgeSynthesizer
-from harness.validation import (
+from mining_risk_serve.harness.agentfs import AgentFS
+from mining_risk_serve.harness.knowledge_base import KnowledgeBaseManager
+from mining_risk_serve.harness.monte_carlo import MonteCarloResult, MonteCarloValidator, SamplingNode
+from mining_risk_serve.harness.proposer import Proposer
+from mining_risk_serve.harness.risk_assessment import RiskAssessor, RiskAssessmentResult
+from mining_risk_serve.harness.rks import RecursiveKnowledgeSynthesizer
+from mining_risk_serve.harness.validation import (
     Checker,
     EvidenceRetriever,
     ToolCallInterceptor,
@@ -25,7 +25,7 @@ from harness.validation import (
     logic_checker,
     run_march_validation,
 )
-from utils.exceptions import HighRiskBlockedError
+from mining_risk_common.utils.exceptions import HighRiskBlockedError
 
 
 def _evidence_items(vr):

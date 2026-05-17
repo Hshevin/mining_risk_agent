@@ -15,23 +15,19 @@ tmp_pytest/
 !.env.example
 .venv/
 
-# Runtime data
+# Runtime data（统一存放 Agent 运行状态、记忆库、向量库、上传、审计 DB 等）
+var/**
+!var/.gitkeep
+!var/**/.gitkeep
+
+# Logs
 *.log
 logs/*.log
-data/*.db
-data/approval_store.json
-data/audit_log.json
-data/enterprise_risk_history.json
-data/iteration_history.json
-data/long_term.json
-data/short_term.json
-data/warning_experience.json
-data/chroma_db/
-data/snapshots/
-data/uploads/
-audit/iterations/
-models/candidates/
-models/production/demo_current_pointer.json
+
+# Training intermediates
+catboost_info/
+
+# Reports outputs（保留目录结构，不入库具体报告）
 reports/approval/
 reports/canary/
 reports/ci/
@@ -47,9 +43,11 @@ reports/*_inventory_report.md
 reports/*_field_mapping.csv
 reports/*_report.md
 reports/KNOWLEDGE_SYSTEM_FINAL_AUDIT.md
-./data
-# Training intermediates
-catboost_info/
+
+# Build / packaging
+build/
+dist/
+*.egg-info/
 
 # Frontend build artifacts
 frontend/node_modules/
@@ -61,7 +59,5 @@ frontend/*.tsbuildinfo
 # OS files
 .DS_Store
 
-*.pyc
-*/__pycache__/*
-*.log
+# Editor
 .vscode

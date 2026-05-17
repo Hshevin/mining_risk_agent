@@ -4,7 +4,7 @@ NLP 管道单元测试
 
 import pytest
 
-from harness.nlp_pipeline import NERPipeline, bio_decode, bio_encode
+from mining_risk_serve.harness.nlp_pipeline import NERPipeline, bio_decode, bio_encode
 
 
 class TestBIOConversion:

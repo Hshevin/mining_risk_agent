@@ -1,6 +1,6 @@
 from fastapi.testclient import TestClient
 
-from api.main import create_app
+from mining_risk_serve.api.main import create_app
 
 
 def test_knowledge_system_overview_read_only_shape():

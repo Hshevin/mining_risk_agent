@@ -99,3 +99,39 @@ export async function postJson<T>(
 }
 
 export const apiBaseLabel = API_BASE || "(同源)";
+
+/** 将失败响应转为可读错误信息。 */
+export async function responseError(resp: Response): Promise<string> {
+  const apiErr = await parseApiError(resp);
+  if (apiErr?.message) return apiErr.message;
+  const text = await resp.text().catch(() => "");
+  return `HTTP ${resp.status} ${resp.statusText}${text ? ` ${text}` : ""}`;
+}
+
+type FetchJsonOptions = RequestInit & { admin?: boolean };
+
+/** GET/POST JSON，非 2xx 时抛出 Error。 */
+export async function fetchJsonStrict<T>(
+  path: string,
+  options: FetchJsonOptions = {},
+): Promise<T> {
+  const { admin, headers, ...rest } = options;
+  const resp = await fetch(buildUrl(path), {
+    ...rest,
+    headers: admin ? adminHeaders(headers) : headers,
+  });
+  if (!resp.ok) {
+    throw new Error(await responseError(resp));
+  }
+  return (await resp.json()) as T;
+}
+
+/** GET JSON；404 返回 null，其它非 2xx 抛出 Error。 */
+export async function fetchJsonNullable404<T>(path: string): Promise<T | null> {
+  const resp = await fetch(buildUrl(path), { method: "GET" });
+  if (resp.status === 404) return null;
+  if (!resp.ok) {
+    throw new Error(await responseError(resp));
+  }
+  return (await resp.json()) as T;
+}

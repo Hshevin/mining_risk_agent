@@ -1,8 +1,8 @@
 from pathlib import Path
 
-from harness.agentfs import AgentFS
-from harness.knowledge_base import KnowledgeBaseManager
-from harness.vector_store import split_by_headers
+from mining_risk_serve.harness.agentfs import AgentFS
+from mining_risk_serve.harness.knowledge_base import KnowledgeBaseManager
+from mining_risk_serve.harness.vector_store import split_by_headers
 from scripts.sync_kb_to_agentfs import (
     MAIN_KB_FILES,
     agentfs_manifest,

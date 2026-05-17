@@ -13,10 +13,12 @@ import sys
 import tempfile
 import time
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, _PROJECT_ROOT)
+sys.path.insert(0, os.path.join(_PROJECT_ROOT, "src"))
 
-from harness.agentfs import AgentFS
-from harness.memory import HybridMemoryManager, ShortTermMemory, LongTermMemory
+from mining_risk_serve.harness.agentfs import AgentFS
+from mining_risk_serve.harness.memory import HybridMemoryManager, ShortTermMemory, LongTermMemory
 
 
 def short_term_validation():
@@ -109,7 +111,7 @@ async def long_term_recall_validation():
     print("=" * 60)
 
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
-        from harness.vector_store import VectorStore
+        from mining_risk_serve.harness.vector_store import VectorStore
 
         def _mock_embed(texts):
             def _vec(t):

@@ -16,17 +16,16 @@ services:
     ports:
       - "127.0.0.1:8000:8000"
     volumes:
-      - ./data:/app/data
-      - ./models:/app/models
+      - ./packages:/app/packages
+      - ./datasets:/app/datasets
+      - ./var:/app/var
+      - ./artifacts:/app/artifacts
       - ./logs:/app/logs
       - ./knowledge_base:/app/knowledge_base
       - ./memory:/app/memory
-      - ./new_data:/app/new_data
-      - ./api:/app/api
-      - ./utils:/app/utils
       - ./config.yaml:/app/config.yaml
     environment:
-      PYTHONPATH: /app
+      MINING_PROJECT_ROOT: /app
       PYTHONUNBUFFERED: "1"
       # LLM / OpenAI 兼容 SDK 凭证（如需）。
       # 任意自定义 provider 可通过通用 LLM_* 覆盖，或在 config.yaml 中配置 api_key_env 后透传对应变量。
@@ -48,7 +47,7 @@ services:
       OPENBLAS_NUM_THREADS: "1"
       MKL_NUM_THREADS: "1"
       NUMEXPR_NUM_THREADS: "1"
-    command: uvicorn api.main:app --host 0.0.0.0 --port 8000
+    command: uvicorn mining_risk_serve.api.main:app --host 0.0.0.0 --port 8000
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8000/health"]

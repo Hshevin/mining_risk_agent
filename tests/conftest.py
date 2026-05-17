@@ -1,6 +1,6 @@
 """
 pytest 配置
-添加项目根目录到 sys.path
+安装 workspace 包后运行测试；本地未安装时回退到 packages/*/src。
 """
 
 import os
@@ -11,10 +11,20 @@ import tempfile
 os.environ.setdefault("GLM5_API_KEY", "test-key")
 
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-parent_root = os.path.dirname(project_root)
+os.environ.setdefault("MINING_PROJECT_ROOT", project_root)
 
-if parent_root not in sys.path:
-    sys.path.insert(0, parent_root)
+package_src_roots = [
+    os.path.join(project_root, "packages", name, "src")
+    for name in (
+        "mining_risk_common",
+        "mining_risk_serve",
+        "mining_risk_train",
+        "mining_risk_compat",
+    )
+]
+for src_root in reversed(package_src_roots):
+    if src_root not in sys.path:
+        sys.path.insert(0, src_root)
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 

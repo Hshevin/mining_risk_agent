@@ -4,10 +4,10 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
-from api.main import app
-from api.routers import iteration as iteration_router
-from iteration.data_source import DemoReplayDataSource
-from iteration.demo_replay import DemoReplayService
+from mining_risk_serve.api.main import app
+from mining_risk_serve.api.routers import iteration as iteration_router
+from mining_risk_serve.iteration.data_source import DemoReplayDataSource
+from mining_risk_serve.iteration.demo_replay import DemoReplayService
 
 
 DEMO_DIR = Path(__file__).resolve().parent.parent / "data" / "demo"

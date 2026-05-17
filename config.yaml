@@ -6,14 +6,20 @@ project:
   version: "1.0.0"
   debug: false
 
+# 顶层目录根（可通过 MINING_DATASET_ROOT / MINING_VAR_ROOT / MINING_ARTIFACTS_ROOT 环境变量覆盖）
+paths:
+  dataset_root: "datasets"
+  var_root: "var"
+  artifacts_root: "artifacts"
+
 # 数据配置
 data:
-  public_data_root: "../公开数据/公开数据"
+  public_data_root: "datasets/raw/public"
   all_public_data_paths:
-    - "../公开数据/公开数据"
-  raw_data_path: "../公开数据/公开数据/数据补充"
-  reference_data_path: "../公开数据/公开数据/数据参考"
-  merged_data_path: "../公开数据/公开数据/new_已清洗.xlsx"  # 预合并训练集（80016行×214列）
+    - "datasets/raw/public"
+  raw_data_path: "datasets/raw/public/数据补充"
+  reference_data_path: "datasets/raw/public/数据参考"
+  merged_data_path: "datasets/interim/merged/new_已清洗.xlsx"  # 预合并训练集（80016行×214列）
   supported_formats: ["csv", "xlsx", "json"]
   encoding: "utf-8-sig"
   csv_encoding_fallbacks: ["utf-8-sig", "utf-8", "gb18030", "gbk"]
@@ -264,8 +270,8 @@ model:
       test: 0.1
     
     # 模型保存路径（使用仅含树模型基学习器的 stable 产物，避免 Keras 反序列化不兼容）
-    model_path: "models/stacking_risk_v1_stable.pkl"
-    pipeline_path: "models/preprocessing_pipeline.pkl"
+    model_path: "artifacts/models/stacking_risk_v1_stable.pkl"
+    pipeline_path: "artifacts/pipelines/preprocessing_pipeline.pkl"
   
   # 风险等级映射
   risk_levels:
@@ -289,10 +295,10 @@ model:
 harness:
   # AgentFS 配置
   agentfs:
-    db_path: "data/agentfs.db"
+    db_path: "var/agentfs/agentfs.db"
     snapshot_interval: 3600  # 秒
-    git_repo_path: "data/agentfs_git"
-    snapshots_dir: "data/snapshots"
+    git_repo_path: "var/agentfs/git"
+    snapshots_dir: "var/snapshots"
   
   # 记忆系统配置
   memory:
@@ -331,7 +337,7 @@ harness:
       
       rag:
         enabled: true  # 可用 RAG_ENABLED=false / MINING_RAG_ENABLED=false 在部署环境关闭
-        persist_directory: "data/chroma_db"
+        persist_directory: "var/chroma"
         collection_name: "knowledge_base"
         embedding_backend: "auto"  # auto 优先真实模型，缺依赖时可降级 deterministic fallback
         allow_fallback_embedding: true
@@ -466,12 +472,12 @@ scenarios:
 iteration:
   data_source:
     type: "demo_replay"
-    demo_dir: "data/demo"
+    demo_dir: "datasets/demo"
     reports_dir: "reports/demo_replay"
   monitor:
     sample_threshold: 5000
     f1_threshold: 0.85
-    db_path: "data/audit.db"
+    db_path: "var/audit/audit.db"
   approvers:
     security: "security@mining-risk.gov.cn"
     tech: "tech@mining-risk.gov.cn"
@@ -491,6 +497,6 @@ iteration:
 
 # 审计配置
 audit:
-  db_path: "data/audit.db"
+  db_path: "var/audit/audit.db"
   retention_days: 365
   auto_archive: true

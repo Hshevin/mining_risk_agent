@@ -12,20 +12,20 @@ import pytest
 from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 
-from api.exception_handlers import register_exception_handlers
-from api.schemas.common import ApiResponse, ErrorDetail, HealthPayload, PaginatedData, fail, ok
-from api.schemas.knowledge import KnowledgeAppendRequest, KnowledgeUpdateRequest
-from api.schemas.prediction import (
+from mining_risk_serve.api.exception_handlers import register_exception_handlers
+from mining_risk_serve.api.schemas.common import ApiResponse, ErrorDetail, HealthPayload, PaginatedData, fail, ok
+from mining_risk_serve.api.schemas.knowledge import KnowledgeAppendRequest, KnowledgeUpdateRequest
+from mining_risk_serve.api.schemas.prediction import (
     VALID_SCENARIO_IDS,
     DecisionRequest,
     LLMUpdateRequest,
     PredictRequest,
 )
-from api.security import require_admin_token
-from api.services.dependencies import ResourceRegistry, mock_fallback_enabled
-from api.services.knowledge_service import KnowledgeService
-from api.services.prediction_service import PredictionService
-from utils.exceptions import DataValidationError, KnowledgeBaseError, MiningRiskAgentException
+from mining_risk_serve.api.security import require_admin_token
+from mining_risk_serve.api.services.dependencies import ResourceRegistry, mock_fallback_enabled
+from mining_risk_serve.api.services.knowledge_service import KnowledgeService
+from mining_risk_serve.api.services.prediction_service import PredictionService
+from mining_risk_common.utils.exceptions import DataValidationError, KnowledgeBaseError, MiningRiskAgentException
 
 
 # ---------------------------------------------------------------------------
@@ -254,7 +254,7 @@ class TestPredictionServiceLlmUpdate:
     """会修改进程内全局配置对象，串行测试下在末尾做并恢复。"""
 
     def test_update_llm_config_sets_active_provider(self):
-        from utils.config import get_config
+        from mining_risk_common.utils.config import get_config
 
         app_cfg = get_config()
         prev_provider = app_cfg.llm.provider

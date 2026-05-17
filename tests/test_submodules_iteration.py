@@ -9,9 +9,9 @@ import tempfile
 
 import pytest
 
-from iteration.canary import CANARY_RATIOS, CanaryDeployment
-from iteration.monitor import ModelMonitor, TriggerSignal
-from iteration.state import (
+from mining_risk_serve.iteration.canary import CANARY_RATIOS, CanaryDeployment
+from mining_risk_serve.iteration.monitor import ModelMonitor, TriggerSignal
+from mining_risk_serve.iteration.state import (
     TRIGGER_REASON_RISK_SAMPLES,
     IterationRecord,
     IterationStateStore,

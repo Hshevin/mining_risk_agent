@@ -23,9 +23,12 @@ import pandas as pd
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
+SRC_ROOT = PROJECT_ROOT / "src"
+if str(SRC_ROOT) not in sys.path:
+    sys.path.insert(0, str(SRC_ROOT))
 
-from data.loader import DataLoader  # noqa: E402
-from utils.config import get_config, resolve_project_path  # noqa: E402
+from mining_risk_common.dataplane.loader import DataLoader  # noqa: E402
+from mining_risk_common.utils.config import get_config, resolve_project_path  # noqa: E402
 
 
 TARGET_KB = PROJECT_ROOT / "knowledge_base" / "企业已具备的执行条件.md"
@@ -1877,7 +1880,7 @@ def build_markdown(
     parts.append(
         "\n".join(
             [
-                "本轮已先更新文件系统知识库 Markdown，未直接写入 `data/agentfs.db`，避免覆盖 AgentFS 中可能存在的版本链和权限元数据。",
+                "本轮已先更新文件系统知识库 Markdown，未直接写入 `var/agentfs/agentfs.db`，避免覆盖 AgentFS 中可能存在的版本链和权限元数据。",
                 "建议同步流程：",
                 "1. 运行 `venv\\Scripts\\python.exe scripts\\check_knowledge_env.py` 对比文件系统与 AgentFS 中的知识库条目。",
                 "2. 人工确认本文件内容后，通过项目现有 AgentFS 写入接口将 `knowledge_base/企业已具备的执行条件.md` 同步为同名路径。",

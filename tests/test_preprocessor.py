@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from data.preprocessor import (
+from mining_risk_common.dataplane.preprocessor import (
     BinaryEncoder,
     ConfinedSpaceORTransformer,
     DataCredibilityTransformer,

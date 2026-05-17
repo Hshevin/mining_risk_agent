@@ -14,17 +14,20 @@ from pathlib import Path
 # 将项目根目录加入路径
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 parent_root = os.path.dirname(project_root)
+src_root = os.path.join(project_root, "src")
 if parent_root not in sys.path:
     sys.path.insert(0, parent_root)
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
+if src_root not in sys.path:
+    sys.path.insert(0, src_root)
 
 import sqlite3
 
 from git import Repo
 
-from utils.config import get_config
-from utils.logger import get_logger
+from mining_risk_common.utils.config import get_config
+from mining_risk_common.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -39,7 +42,7 @@ def snapshot(agent_id: str, message: str) -> str:
     config = get_config()
     db_path = config.harness.agentfs.db_path
     git_repo_path = config.harness.agentfs.git_repo_path
-    snapshots_dir = getattr(config.harness.agentfs, "snapshots_dir", "data/snapshots")
+    snapshots_dir = getattr(config.harness.agentfs, "snapshots_dir", "var/snapshots")
 
     os.makedirs(snapshots_dir, exist_ok=True)
     os.makedirs(git_repo_path, exist_ok=True)

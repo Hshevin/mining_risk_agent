@@ -1,11 +1,11 @@
 from pathlib import Path
 
-from harness.validation import (
+from mining_risk_serve.harness.validation import (
     COMPLIANCE_RULE_REFERENCES,
     FEASIBILITY_RULE_REFERENCES,
     LOGIC_RULE_REFERENCES,
 )
-from harness.vector_store import split_by_headers
+from mining_risk_serve.harness.vector_store import split_by_headers
 from scripts.rebuild_rule_kbs import (
     COMPLIANCE_FILE,
     PHYSICS_FILE,

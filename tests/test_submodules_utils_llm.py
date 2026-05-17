@@ -8,9 +8,9 @@ from pathlib import Path
 
 import pytest
 
-from llm.glm5_client import GLM5Client, OpenAICompatibleClient
-from utils.config import PROJECT_ROOT, resolve_project_path
-from utils.exceptions import (
+from mining_risk_serve.llm.glm5_client import GLM5Client, OpenAICompatibleClient
+from mining_risk_common.utils.config import PROJECT_ROOT, resolve_project_path
+from mining_risk_common.utils.exceptions import (
     AgentFSError,
     AuditLogError,
     DataLoadingError,

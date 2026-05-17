@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from harness.vector_store import split_by_headers
+from mining_risk_serve.harness.vector_store import split_by_headers
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]

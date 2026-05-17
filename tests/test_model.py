@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from model.stacking import StackingRiskModel
+from mining_risk_common.model.stacking import StackingRiskModel
 
 
 class TestStackingRiskModel:

@@ -4,7 +4,7 @@
 
 import pytest
 
-from harness.reranker import Reranker, rerank
+from mining_risk_serve.harness.reranker import Reranker, rerank
 
 
 class TestReranker:

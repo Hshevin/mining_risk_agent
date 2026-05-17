@@ -87,7 +87,7 @@
 
 ### 9. 容器内训练数据路径不可用
 
-证据：`config.yaml` 的 `data.raw_data_path`、`reference_data_path`、`merged_data_path` 指向 `../公开数据/...`，compose 未挂载该目录。
+证据：`config.yaml` 的 `data.raw_data_path`、`reference_data_path`、`merged_data_path` 默认指向 `datasets/...`，compose 已挂载 `./datasets:/app/datasets`。
 
 影响：容器内 API 推理可依赖 `models/`，但训练、合并、迭代触发中依赖公开数据路径的流程会失败。
 

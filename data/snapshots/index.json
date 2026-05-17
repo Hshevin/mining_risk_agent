@@ -1,9 +1,0 @@
-[
-  {
-    "commit_id": "a5458b8d822bc38bf17d5fc71b36c828848b8444",
-    "timestamp": 1777644782.0567148,
-    "agent_id": "test",
-    "message": "init",
-    "db_name": "agentfs.db"
-  }
-]

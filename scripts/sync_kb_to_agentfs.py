@@ -22,10 +22,13 @@ from typing import Any
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
+SRC_ROOT = PROJECT_ROOT / "src"
+if str(SRC_ROOT) not in sys.path:
+    sys.path.insert(0, str(SRC_ROOT))
 
-from harness.agentfs import AgentFS
-from harness.knowledge_base import KnowledgeBaseManager
-from utils.config import get_config, resolve_project_path
+from mining_risk_serve.harness.agentfs import AgentFS
+from mining_risk_serve.harness.knowledge_base import KnowledgeBaseManager
+from mining_risk_common.utils.config import get_config, resolve_project_path
 
 
 DEFAULT_AGENT_ID = "kb_sync"
@@ -299,7 +302,7 @@ def build_summary(args: argparse.Namespace) -> dict[str, Any]:
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dry-run", action="store_true", help="Compare only; do not write AgentFS.")
-    parser.add_argument("--backup", action="store_true", help="Copy data/agentfs.db into snapshots first.")
+    parser.add_argument("--backup", action="store_true", help="Copy var/agentfs/agentfs.db into snapshots first.")
     parser.add_argument("--sync", action="store_true", help="Write the six Markdown KB files into AgentFS.")
     parser.add_argument("--verify", action="store_true", help="Verify AgentFS byte content against filesystem.")
     parser.add_argument("--snapshot", action="store_true", help="Create an AgentFS Git snapshot after sync.")

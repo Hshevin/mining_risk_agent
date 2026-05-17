@@ -1,7 +1,7 @@
 """Inventory public enterprise data and produce a knowledge-base field map.
 
 This script is intentionally read-only for source data and project code. It
-scans ``公开数据`` recursively, reads every .csv/.xlsx table, profiles schemas,
+scans ``datasets/raw/public`` recursively, reads every .csv/.xlsx table, profiles schemas,
 infers field themes, maps raw columns to canonical fields, and writes report
 artifacts under ``mining_risk_agent/reports``.
 """
@@ -22,9 +22,10 @@ from typing import Any
 import pandas as pd
 
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-PUBLIC_DATA_ROOT = REPO_ROOT / "公开数据"
-REPORT_DIR = REPO_ROOT / "mining_risk_agent" / "reports"
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = PROJECT_ROOT.parent
+PUBLIC_DATA_ROOT = PROJECT_ROOT / "datasets" / "raw" / "public"
+REPORT_DIR = PROJECT_ROOT / "reports"
 REPORT_PATH = REPORT_DIR / "public_data_inventory_report.md"
 MAPPING_CSV_PATH = REPORT_DIR / "public_data_field_mapping.csv"
 INVENTORY_JSON_PATH = REPORT_DIR / "public_data_inventory.json"

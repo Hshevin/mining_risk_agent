@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from harness.vector_store import split_by_headers
+from mining_risk_serve.harness.vector_store import split_by_headers
 from scripts.sync_kb_to_agentfs import get_paths, verify_agentfs_content
 
 

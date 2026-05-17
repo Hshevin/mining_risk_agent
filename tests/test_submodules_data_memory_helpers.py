@@ -6,8 +6,8 @@ from __future__ import annotations
 
 import pytest
 
-from harness.memory_statistics import iso_from_timestamp, parse_time
-from iteration.data_source import BatchMetadata, EnterpriseDataBatch
+from mining_risk_serve.harness.memory_statistics import iso_from_timestamp, parse_time
+from mining_risk_serve.iteration.data_source import BatchMetadata, EnterpriseDataBatch
 
 
 class TestBatchMetadata:

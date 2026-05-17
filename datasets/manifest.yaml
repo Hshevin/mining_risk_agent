@@ -1,0 +1,32 @@
+# 训练数据清单
+# 在添加 / 替换数据后请同步更新本文件
+version: "1.0.0"
+source: "公开数据(1).zip"
+updated_at: "2026-05-16"
+
+raw:
+  root: "datasets/raw/public"
+  subdirs:
+    - 数据补充
+    - 数据参考
+    - 新数据
+    - 企业相关表导出
+  notes: "原 new_data/ 目录内容整体迁入，文件清单详见 reports/public_data_inventory.json"
+
+interim:
+  merged_path: "datasets/interim/merged/new_已清洗.xlsx"
+  expected_rows: 80016
+  expected_cols: 214
+  notes: "预合并训练宽表。若文件缺失需从公开数据原始压缩包重新提取。"
+
+demo:
+  root: "datasets/demo"
+  batches:
+    - normal_batch.json
+    - drift_high.json
+    - drift_high_block.json
+    - f1_drop_retrain.json
+    - regression_block.json
+    - regression_fail.json
+    - risk_spike_retrain.json
+  notes: "模型迭代演示批次，DemoReplayDataSource 直接读取"

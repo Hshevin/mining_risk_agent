@@ -18,10 +18,13 @@ from typing import Any
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
+SRC_ROOT = PROJECT_ROOT / "src"
+if str(SRC_ROOT) not in sys.path:
+    sys.path.insert(0, str(SRC_ROOT))
 
-from harness.knowledge_base import KnowledgeBaseManager
-from harness.vector_store import VectorStore, split_by_headers
-from utils.config import get_config, resolve_project_path
+from mining_risk_serve.harness.knowledge_base import KnowledgeBaseManager
+from mining_risk_serve.harness.vector_store import VectorStore, split_by_headers
+from mining_risk_common.utils.config import get_config, resolve_project_path
 
 
 DEFAULT_SOURCE_COMMIT = "2f0819487bdaf2a8495f15c260015cbf932d29d3"
@@ -246,7 +249,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--clear", action="store_true", help="Delete and recreate the target Chroma collection first.")
     parser.add_argument("--kb-dir", default="knowledge_base", help="Knowledge base directory to index.")
-    parser.add_argument("--persist-dir", default="data/chroma_db", help="Chroma persist directory.")
+    parser.add_argument("--persist-dir", default="var/chroma", help="Chroma persist directory.")
     parser.add_argument("--collection-name", default="knowledge_base", help="Chroma collection name.")
     parser.add_argument(
         "--embedding-backend",

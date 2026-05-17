@@ -8,8 +8,8 @@ import json
 
 import pytest
 
-from harness.proposer import Proposer
-from harness.risk_assessment import RiskAssessor, RiskAssessmentResult
+from mining_risk_serve.harness.proposer import Proposer
+from mining_risk_serve.harness.risk_assessment import RiskAssessor, RiskAssessmentResult
 
 
 class TestRiskAssessor:

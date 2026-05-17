@@ -38,7 +38,7 @@ curl -X POST http://localhost:8000/api/v1/knowledge/append \
 知识库文件存储于 `AgentFS` 虚拟文件系统中，也可通过 SQLite 直接操作：
 
 ```bash
-sqlite3 data/agentfs.db
+sqlite3 var/agentfs/agentfs.db
 SELECT path FROM metadata WHERE path LIKE 'knowledge_base/%';
 ```
 
@@ -55,7 +55,7 @@ curl -X POST "http://localhost:8000/api/v1/knowledge/snapshot?commit_message=更
 ### 查看历史
 
 ```bash
-cd data/agentfs_git
+cd var/agentfs/git
 git log --oneline
 ```
 

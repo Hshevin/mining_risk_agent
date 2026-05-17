@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mining_risk_agent"
+version = "1.0.0"
+description = "工矿企业风险预警智能体 — monorepo workspace"
+requires-python = ">=3.10"
+dependencies = [
+    "mining_risk_common",
+    "mining_risk_serve",
+    "mining_risk_train",
+]
+
+[tool.uv.workspace]
+members = [
+    "packages/mining_risk_common",
+    "packages/mining_risk_serve",
+    "packages/mining_risk_train",
+    "packages/mining_risk_compat",
+]
+
+[tool.uv.sources]
+mining_risk_common = { workspace = true }
+mining_risk_serve = { workspace = true }
+mining_risk_train = { workspace = true }
+mining_risk = { workspace = true }
+
+[tool.setuptools]
+packages = []

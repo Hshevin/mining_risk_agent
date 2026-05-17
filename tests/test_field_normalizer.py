@@ -1,6 +1,6 @@
 import os
 
-from data.field_normalizer import normalize_enterprise_record
+from mining_risk_common.dataplane.field_normalizer import normalize_enterprise_record
 
 
 os.environ.setdefault("GLM5_API_KEY", "test-key")

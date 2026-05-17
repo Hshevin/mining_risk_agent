@@ -1564,7 +1564,10 @@ def write_targets() -> dict[str, int]:
 def _load_split_by_headers():
     if str(PROJECT_ROOT) not in sys.path:
         sys.path.insert(0, str(PROJECT_ROOT))
-    from harness.vector_store import split_by_headers
+    src_root = PROJECT_ROOT / "src"
+    if str(src_root) not in sys.path:
+        sys.path.insert(0, str(src_root))
+    from mining_risk_serve.harness.vector_store import split_by_headers
 
     return split_by_headers
 

@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mining_risk_serve"
+version = "1.0.0"
+description = "工矿风险智能体 — FastAPI 后端、Agent 与 Harness"
+requires-python = ">=3.10"
+dependencies = [
+    "mining_risk_common",
+    "mining_risk_train",
+    "xgboost>=2.0.0",
+    "lightgbm>=4.0.0",
+    "catboost>=1.2.0",
+    "fastapi>=0.100.0",
+    "uvicorn[standard]>=0.23.0",
+    "python-multipart>=0.0.6",
+    "langgraph>=0.2.0",
+    "langchain>=0.2.0",
+    "openai>=1.0.0",
+    "GitPython>=3.1.0",
+    "requests>=2.31.0",
+    "jinja2>=3.1.0",
+    "tqdm>=4.66.0",
+    "reportlab>=4.0.0",
+    "tiktoken>=0.5.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["mining_risk_serve*"]

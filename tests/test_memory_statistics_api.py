@@ -4,11 +4,11 @@ import tempfile
 
 from fastapi.testclient import TestClient
 
-from api.main import create_app
-from api.routers import memory as memory_router
-from harness.agentfs import AgentFS
-from harness.memory import LongTermMemory, ShortTermMemory
-from harness.memory_statistics import MemoryStatsFilters, build_statistics_payload
+from mining_risk_serve.api.main import create_app
+from mining_risk_serve.api.routers import memory as memory_router
+from mining_risk_serve.harness.agentfs import AgentFS
+from mining_risk_serve.harness.memory import LongTermMemory, ShortTermMemory
+from mining_risk_serve.harness.memory_statistics import MemoryStatsFilters, build_statistics_payload
 
 
 def _char_tokens(text: str) -> int:

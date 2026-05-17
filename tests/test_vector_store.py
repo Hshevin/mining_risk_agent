@@ -8,8 +8,8 @@ import tempfile
 
 import pytest
 
-from harness.vector_store import VectorStore, split_by_headers
-from utils.config import resolve_project_path
+from mining_risk_serve.harness.vector_store import VectorStore, split_by_headers
+from mining_risk_common.utils.config import resolve_project_path
 
 
 def _mock_embed(texts):
@@ -162,7 +162,7 @@ class TestVectorStore:
 
 
 class TestFormalRagIndex:
-    """正式 data/chroma_db 索引冒烟测试。"""
+    """正式 var/chroma 索引冒烟测试。"""
 
     @pytest.fixture(autouse=True)
     def _cleanup_store(self):
@@ -171,14 +171,14 @@ class TestFormalRagIndex:
 
     def _formal_store(self):
         self._store = VectorStore(
-            persist_directory="data/chroma_db",
+            persist_directory="var/chroma",
             collection_name="knowledge_base",
             embedding_backend="fallback",
         )
         return self._store
 
     def test_formal_index_exists_and_collection_name(self):
-        persist_dir = resolve_project_path("data/chroma_db")
+        persist_dir = resolve_project_path("var/chroma")
         assert persist_dir.exists()
         assert (persist_dir / "chroma.sqlite3").exists()
 

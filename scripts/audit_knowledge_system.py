@@ -28,14 +28,17 @@ from unittest.mock import patch
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
+SRC_ROOT = PROJECT_ROOT / "src"
+if str(SRC_ROOT) not in sys.path:
+    sys.path.insert(0, str(SRC_ROOT))
 
 
-from data.loader import DataLoader
-from harness.agentfs import AgentFS
-from harness.knowledge_base import KnowledgeBaseManager
-from harness.memory import HybridMemoryManager, LongTermMemory, ShortTermMemory
-from harness.validation import EvidenceRetriever
-from harness.vector_store import VectorStore
+from mining_risk_common.dataplane.loader import DataLoader
+from mining_risk_serve.harness.agentfs import AgentFS
+from mining_risk_serve.harness.knowledge_base import KnowledgeBaseManager
+from mining_risk_serve.harness.memory import HybridMemoryManager, LongTermMemory, ShortTermMemory
+from mining_risk_serve.harness.validation import EvidenceRetriever
+from mining_risk_serve.harness.vector_store import VectorStore
 from scripts.sync_kb_to_agentfs import (
     agentfs_manifest,
     compare_manifests,
@@ -43,7 +46,7 @@ from scripts.sync_kb_to_agentfs import (
     get_paths,
     verify_agentfs_content,
 )
-from utils.config import get_config, resolve_project_path
+from mining_risk_common.utils.config import get_config, resolve_project_path
 
 
 PASS = "PASS"
@@ -409,7 +412,7 @@ def check_agentfs_deprecated_path_retained() -> AuditResult:
 def check_chroma_index() -> AuditResult:
     config = get_config()
     rag_config = config.harness.memory.long_term.rag
-    persist_dir = resolve_project_path(rag_config.get("persist_directory", "data/chroma_db"))
+    persist_dir = resolve_project_path(rag_config.get("persist_directory", "var/chroma"))
     report = _safe_json(PROJECT_ROOT / "reports" / "rag_index_rebuild_run.json")
     if not (persist_dir.exists() and (persist_dir / "chroma.sqlite3").exists()):
         return _result("rag.formal_chroma_index", FAIL, "Formal Chroma directory or sqlite file is missing", persist_dir=str(persist_dir))
@@ -468,7 +471,7 @@ def check_rag_query_returns_evidence() -> AuditResult:
     store = None
     try:
         store = VectorStore(
-            persist_directory=str(resolve_project_path("data/chroma_db")),
+            persist_directory=str(resolve_project_path("var/chroma")),
             collection_name="knowledge_base",
             embedding_backend="fallback",
         )
@@ -606,7 +609,7 @@ def check_memory_archive() -> AuditResult:
 
 
 async def _check_workflow_light_e2e_async() -> AuditResult:
-    from agent.workflow import ScenarioConfig, node_decision_generation, node_memory_recall
+    from mining_risk_serve.agent.workflow import ScenarioConfig, node_decision_generation, node_memory_recall
 
     state = {
         "enterprise_id": "AUDIT-E001",
@@ -885,7 +888,7 @@ def render_markdown_report(summary: dict[str, Any]) -> str:
         ),
         (
             "正式 RAG 索引和证据召回",
-            "data/chroma_db 存在，collection=knowledge_base，chunk 数合理；RAG 查询能返回 source_file 证据块。",
+            "var/chroma 存在，collection=knowledge_base，chunk 数合理；RAG 查询能返回 source_file 证据块。",
             "rag.formal_chroma_index；rag.query_returns_evidence_blocks。",
             "本地可用",
             "当前仍使用 deterministic fallback embedding/reranker，不是真实 BGE。",

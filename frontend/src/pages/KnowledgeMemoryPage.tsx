@@ -434,7 +434,7 @@ function DataManagementSection() {
 
   const importFromNewData = useCallback(async () => {
     setLoading(true);
-    setStatus("正在扫描并导入 new_data 目录...");
+    setStatus("正在扫描并导入 datasets/raw/public 目录...");
     try {
       const result = await importEnterpriseData("folder");
       if (result?.success) {
@@ -472,7 +472,7 @@ function DataManagementSection() {
         </div>
         <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
           <button className="scada-btn" type="button" onClick={importFromNewData} disabled={loading}>
-            {loading ? "导入中..." : "📁 从 new_data/ 导入Excel数据"}
+            {loading ? "导入中..." : "📁 从 datasets/raw/public 导入Excel数据"}
           </button>
           <button className="scada-btn secondary" type="button" onClick={refreshStats}>🔄 刷新统计</button>
         </div>

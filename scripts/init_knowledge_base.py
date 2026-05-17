@@ -2,7 +2,7 @@
 企业CSV数据融合脚本：一键生成/增量填充6个核心Markdown知识库文件
 
 用法：
-    python scripts/init_knowledge_base.py --data-dir ../公开数据/
+    python scripts/init_knowledge_base.py --data-dir datasets/raw/public
 """
 
 import argparse
@@ -18,9 +18,12 @@ import pandas as pd
 project_root = Path(__file__).resolve().parent.parent
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
+src_root = project_root / "src"
+if str(src_root) not in sys.path:
+    sys.path.insert(0, str(src_root))
 
-from data.loader import DataLoader
-from utils.logger import get_logger
+from mining_risk_common.dataplane.loader import DataLoader
+from mining_risk_common.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -698,7 +701,7 @@ def extract_feature_metadata(data_dir: str) -> str:
 
 def main():
     parser = argparse.ArgumentParser(description="初始化/增量更新知识库")
-    parser.add_argument("--data-dir", type=str, default="../公开数据/", help="企业CSV数据根目录")
+    parser.add_argument("--data-dir", type=str, default="datasets/raw/public", help="企业CSV数据根目录")
     parser.add_argument("--kb-dir", type=str, default="knowledge_base", help="知识库输出目录")
     parser.add_argument("--incremental", action="store_true", help="增量模式")
     args = parser.parse_args()

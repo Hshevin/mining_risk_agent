@@ -9,7 +9,7 @@ import tempfile
 
 import pytest
 
-from harness.agentfs import AgentFS, FileStat
+from mining_risk_serve.harness.agentfs import AgentFS, FileStat
 
 
 class TestAgentFS:

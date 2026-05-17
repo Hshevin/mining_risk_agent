@@ -5,9 +5,9 @@
 import numpy as np
 import pandas as pd
 
-from data.preprocessor import NumericTransformer, TimeDecayWeightTransformer
-from model.train import prepare_features, sort_by_time
-from utils.config import ConfigManager
+from mining_risk_common.dataplane.preprocessor import NumericTransformer, TimeDecayWeightTransformer
+from mining_risk_train import prepare_features, sort_by_time
+from mining_risk_common.utils.config import ConfigManager
 
 
 def _reset_config_state() -> None:

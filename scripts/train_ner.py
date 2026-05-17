@@ -22,9 +22,12 @@ from transformers import BertTokenizer
 project_root = Path(__file__).resolve().parent.parent
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
+src_root = project_root / "src"
+if str(src_root) not in sys.path:
+    sys.path.insert(0, str(src_root))
 
-from harness.nlp_pipeline import BertBiLSTMCRF, LABEL2ID, ID2LABEL, bio_encode
-from utils.logger import get_logger
+from mining_risk_serve.harness.nlp_pipeline import BertBiLSTMCRF, LABEL2ID, ID2LABEL, bio_encode
+from mining_risk_common.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -180,7 +183,7 @@ def evaluate(model: BertBiLSTMCRF, dataloader: DataLoader, device: str) -> Dict[
 def main():
     parser = argparse.ArgumentParser(description="训练 NER 模型")
     parser.add_argument("--data", type=str, required=True, help="训练数据 JSON 路径")
-    parser.add_argument("--output", type=str, default="models/ner_model.pt", help="模型输出路径")
+    parser.add_argument("--output", type=str, default="artifacts/models/ner_model.pt", help="模型输出路径")
     parser.add_argument("--bert", type=str, default="bert-base-chinese", help="预训练BERT模型名")
     parser.add_argument("--epochs", type=int, default=10, help="训练轮数")
     parser.add_argument("--batch-size", type=int, default=8, help="批次大小")
